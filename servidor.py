@@ -14,20 +14,41 @@ class ServerGUI:
         master.geometry('800x380')
         master.protocol("WM_DELETE_WINDOW", lambda: self.stop_server(close_gui=True))# Al cerrar la ventana se detiene el server
 
-        # Create a frame for new connections
-        self.new_connections_frame = tk.Frame(master, width=260, height=250)  # Increase the width of the frame
-        self.new_connections_frame.config(bg='blue')
-        #self.new_connections_frame.pack()
-        self.new_connections_frame.place_configure(x=500, y=50)
+        self.client_var = tk.StringVar()
+
+        # Create a variable to store the selected client
+        self.selected_client = 'Global'
+        #self.is_private = False
+        #self.selected_client = None
+
+        # Create a canvas and a scrollbar
+        self.canvas = tk.Canvas(master, width=260, height=250, bg='blue')
+        self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
+
+        # Configure the canvas to use the scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # Create a frame to hold the buttons
+        self.buttons_frame = tk.Frame(self.canvas, bg='blue')
+
+        # Add the frame to the canvas
+        self.canvas.create_window((0, 0), window=self.buttons_frame, anchor='nw')
+
+        # Place the canvas and the scrollbar
+        self.canvas.place(x=500, y=50)
+        self.scrollbar.place(x=760, y=50, height=250)
+
+        # Update the scroll region of the canvas when the buttons frame changes size
+        self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
+
 
         # Create a "Global" button
-        self.global_button = tk.Button(self.new_connections_frame, text='Global', command=self.send_message)
-        self.global_button.pack()
-        self.global_button.place_configure(x=10, y=10)
+        self.global_button = tk.Button(master, text='Global', state=tk.DISABLED, command=lambda: self.select_client('Global'))
+        self.global_button.place_configure(x=600, y=15)
 
         # Create a "Remove Offline" button
-        self.remove_offline_button = tk.Button(self.new_connections_frame, text='Eliminar\nDesconectados', command=self.remove_offline)
-        self.remove_offline_button.place_configure(x=30, y=30)
+        self.remove_offline_button = tk.Button(master, text='Eliminar\nDesconectados', command=self.remove_offline)
+        self.remove_offline_button.place_configure(x=580, y=310)
         #self.remove_offline_button.pack()
 
         # Create a dictionary to store the client buttons
@@ -38,7 +59,7 @@ class ServerGUI:
         #self.status_label.pack()
         self.status_label.place_configure(x=180, y=15) 
         self.log_text = tk.Text(master, height=10, width=50)
-        self.log_text.config(state= 'disabled')
+        self.log_text.config(state='disabled')
         #self.log_text.pack()
         self.log_text.place_configure(x=20, y=50)
 
@@ -62,21 +83,36 @@ class ServerGUI:
         #self.send_button.pack()
         self.send_button.place_configure(x=180, y=330)
 
+
         # Servidor corriendo
         self.server_running = False
         # Guardar las conexiones
         self.connections = {}
 
-    # Actualizar Menu de conectados
+    def add_client_button(self, client_name):
+        # Create a button for the client
+        button = tk.Button(self.buttons_frame, text=client_name)
+
+        # Bind a click event to the button
+        button.bind('<Button-1>', lambda e: self.select_client(client_name))
+
+        # Add the button to the frame
+        button.pack()
+
+        # Add the button to the client_buttons dictionary
+        self.client_buttons[client_name] = button
+
+    def select_client(self, client_name):
+        #self.is_private = True
+        # Set the selected client
+        self.selected_client = client_name
+
     def update_client_dropdown(self):
         # Update client buttons
-        for name in self.connections.keys():
+        for i, name in enumerate(self.connections.keys()):
             if name not in self.client_buttons:
                 # Create a new button for the client
-                button = tk.Button(self.new_connections_frame, text=name, command=lambda value=name: self.send_message(value))
-                #button.pack()
-                button.place_configure(x=0, y=0)
-                self.client_buttons[name] = button
+                self.add_client_button(name)
 
     def start_server(self):
         # Inicia el server
@@ -114,64 +150,90 @@ class ServerGUI:
 
 
     def log(self, message):
+        self.log_text.config(state='normal')
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
+        self.log_text.config(state='disabled')
 
-    def handle_connection(self, conn, addr, name):
-        self.log_text.config(state= 'normal')
+    # Modify your handle_connection method
+    def handle_connection(self, client_socket, client_address, client_name):
+        name = client_name
+
+        self.log(f'Cliente {name} conectado.')
+        self.global_button.config(state='normal')  # Enable the 'Global' button
+
+        self.enable_text
         self.log(f'El usuario: {name} se ha conectado')
-        self.client_buttons[name].config(bg='green')
-        self.log_text.config(state= 'disabled')
+        if name in self.client_buttons:
+            self.client_buttons[name].config(bg='green')
+        self.disable_text
 
         while True:
-            # Recibir los datos enviados por el cliente
-            data = conn.recv(1024)  # Se recibio tantos datos en como mensaje
+            try:  # Add try-except block for debugging
+                data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
+            except Exception as e:
+                print(f'Error receiving data: {e}')  # Debugging line
+                break
+
             message = data.decode().strip()  # Los datos se vuelven bits
 
             if message == 'desconectado':
-                # El cliente se ha desconectado
+                self.client_buttons[name].config(bg='red')
                 break
 
             if message == '':
-                # Ignorar mensajes vacíos
                 continue
 
-            # Datos recibido por el usuario conectado al server
-            self.log_text.config(state= 'normal')
+            self.enable_text
             self.log(f'Datos de {name}: {message}')
-            self.log_text.config(state= 'disabled')
+            self.disable_text
 
-            # Lo que ve el cliente
-            response = f'Datos enviados: {message}'.encode()
+            try:  # Add try-except block for debugging
+                response = f'Datos enviados: {message}'.encode()
+                client_socket.sendall(response)
+            except Exception as e:
+                print(f'Error sending data: {e}')  # Debugging line
+                break
 
-            conn.sendall(response)
-
-        # Cerrar la conexión
-        conn.close()
+        client_socket.close()
         del self.connections[name]
         self.master.after(0, self.update_client_dropdown)  # Actualiza el menu de conectados
-        self.log_text.config(state= 'normal')
+        self.enable_text
         self.log(f'Conexion cerrada con {name}')        
-        self.log_text.config(state= 'disabled')
-        
+        self.disable_text
+    
     def send_message(self):
-        self.log_text.config(state= 'normal')
-        message = self.message_text.get(1.0, tk.END).strip()
-        self.message_text.delete(1.0, tk.END)
-        recipient = self.client_var.get()
-
-        if recipient == 'Global':
-            self.log(f'Mensaje Global: {message}')
-            message = f'Mensaje recibido: {message}'
-            for conn in self.connections.values():
-                conn.sendall(message.encode())
+        message = self.message_text.get('1.0', 'end').strip()
+        self.message_text.delete('1.0', 'end')
+        if message == '':
+            return
+        if self.global_button.config('relief')[-1] == 'sunken' or self.selected_client == 'Global':
+            self.enable_text
+            self.log(f'Mensaje global: {message}')
+            # If the 'Global' button is pressed or the selected client is 'Global', send the message to all clients
+            for client_socket in self.connections.values():
+                self.disable_text
+                message_aux = f'Mensaje global: {message}'
+                client_socket.sendall(message_aux.encode())
         else:
-            self.log(f'Mensaje a {recipient}: {message}')
-            conn = self.connections.get(recipient)
-            if conn:
-                message = f'Mensaje recibido: {message}'
-                conn.sendall(message.encode())
-        self.log_text.config(state= 'disabled')
+            # If a client's button is pressed, send the message to that client only
+            selected_client = self.selected_client
+            if self.connections.get(selected_client):
+                self.enable_text
+                self.log(f'Mensaje a {selected_client}: {message}')
+                message_aux = f'Mensaje privado: {message}'
+                self.disable_text
+                self.connections[selected_client].sendall(message_aux.encode())
+            else:
+                self.enable_text
+                self.log(f'{selected_client} no está conectado')
+                self.disable_text
+
+    def disable_text(self):
+        self.log_text.config(state='disabled')
+    
+    def enable_text(self):
+        self.log_text.config(state='normal')
 
     def remove_offline(self):
         # Remove all offline clients from the list of client buttons
@@ -186,14 +248,14 @@ class ServerGUI:
 
         # Vincular el socket a una dirección y puerto específicos
         self.server_socket.bind((HOST, PORT))
-        self.log_text.config(state= 'normal')
+        self.enable_text
         self.log(f'Servidor corriendo en el puerto {PORT}')
 
         # Escuchar en el socket para conexiones entrantes
         self.server_socket.listen(1)
 
         self.connections = {}  
-        self.log_text.config(state= 'disabled')
+        self.disable_text
 
         # Ciclo infinito para manejar conexiones entrantes
         while self.server_running:

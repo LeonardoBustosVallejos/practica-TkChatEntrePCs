@@ -1,0 +1,43 @@
+        self.x = 0
+        self.y = 0
+
+        # Create a canvas and a scrollbar
+        self.canvas = tk.Canvas(master, width=260, height=250, bg='blue')
+        self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
+
+        # Create a frame to hold the buttons
+        self.buttons_frame = tk.Frame(self.canvas, bg='blue')
+        # Configure the canvas to use the scrollbar
+
+        # Add the frame to the canvas
+        self.canvas_window = self.canvas.create_window((0, 0), window=self.buttons_frame, anchor='nw')
+
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.bind('<Configure>', self.on_canvas_configure)
+
+        # Place the canvas and the scrollbar
+        self.canvas.place(x=500, y=50)
+        self.scrollbar.place(x=760, y=50, height=250)
+
+    def add_client_button(self, client_name):
+        button_width = 100
+        button_height = 30
+        canvas_width = self.buttons_frame.winfo_width()
+
+        if self.x + button_width > canvas_width:
+            self.x = 0
+            self.y += button_height
+
+        # Create a button for the client
+        button = tk.Button(self.buttons_frame, text=client_name)
+
+        # Bind a click event to the button
+        button.bind('<Button-1>', lambda e: self.select_client(client_name))
+
+        # Add the button to the frame at the specified position
+        button.place(x=self.x, y=self.y, width=button_width, height=button_height)
+
+        self.x += button_width
+
+        # Add the button to the client_buttons dictionary
+        self.client_buttons[client_name] = button
