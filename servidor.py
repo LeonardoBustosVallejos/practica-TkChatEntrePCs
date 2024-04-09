@@ -18,18 +18,16 @@ class ServerGUI:
 
         # Create a variable to store the selected client
         self.selected_client = 'Global'
-        #self.is_private = False
-        #self.selected_client = None
 
         # Create a canvas and a scrollbar
-        self.canvas = tk.Canvas(master, width=265, height=250, bg='blue')
+        self.canvas = tk.Canvas(master, width=265, height=200, bg='white')
         self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
 
         # Configure the canvas to use the scrollbar
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         # Create a frame to hold the buttons
-        self.buttons_frame = tk.Frame(self.canvas, bg='blue', padx=3, pady=3)
+        self.buttons_frame = tk.Frame(self.canvas, bg='white', padx=3, pady=3)
         self.buttons_per_row = 5
         #self.buttons_frame.grid_propagate(False)
 
@@ -38,7 +36,7 @@ class ServerGUI:
 
         # Place the canvas and the scrollbar
         self.canvas.place(x=500, y=50)
-        self.scrollbar.place(x=770, y=50, height=250)
+        self.scrollbar.place(x=770, y=50, height=200)
         self.current_row = 0
         self.current_row_width = 0
         self.canvas_width = 260 - 10
@@ -52,21 +50,28 @@ class ServerGUI:
         self.global_button.place_configure(x=610, y=15)
 
         # Create a "Remove Offline" button
-        self.remove_offline_button = tk.Button(master, text='Eliminar\nDesconectados', command=self.remove_offline)
-        self.remove_offline_button.place_configure(x=580, y=310)
-        #self.remove_offline_button.pack()
+        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline)
+        self.remove_offline_button.place_configure(x=510, y=280)
 
         # Create a dictionary to store the client buttons
         self.client_buttons = {}
 
         # Estado del servidor
         self.status_label = tk.Label(master, text='Servidor detenido')
-        #self.status_label.pack()
-        self.status_label.place_configure(x=180, y=15) 
+        self.status_label.place_configure(x=180, y = 15) 
         self.log_text = tk.Text(master, height=10, width=50)
         self.log_text.config(state='disabled')
-        #self.log_text.pack()
         self.log_text.place_configure(x=20, y=50)
+
+        # Destinatarios
+        self.messages_to_label = tk.Label(master, text='Mensaje a:')
+        self.messages_to_label.place_configure(x=620, y=260)
+        # Text para mostrar los destinatarios
+        self.messages_to_text = tk.Text(master, bg='#f0f0f0', height = 4, width=18, state=tk.DISABLED)
+        self.messages_to_text.place_configure(x=620, y=280)
+
+        # Insertar el nombre del cliente
+        self.messages_to_text.insert('end', self.client_var)
 
         # Iniciar el server
         self.start_button = tk.Button(master, text='Iniciar', command=self.start_server)
@@ -94,40 +99,34 @@ class ServerGUI:
         # Guardar las conexiones
         self.connections = {}
 
-    def add_client_button(self, client_name):
-        # Create a button for the client
+    def create_button(self, client_name):
         button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
-
-        # Bind a click event to the button
         button.bind('<Button-1>', lambda e: self.select_client(client_name))
-
-        # Force Tkinter to update the button's width
         button.update_idletasks()
+        return button
 
-        # Calculate the width of the new button
-        button_width = button.winfo_reqwidth()
-
-        # If this is the first button or the width of the new button plus the width of the buttons in the current row exceeds the width of the canvas, start a new row
+    def calculate_position(self, button_width):
         if not self.client_buttons or button_width + self.current_row_width > self.canvas_width:
             self.current_row += 1
             self.current_row_width = 0
-            self.current_column = 0  # Reset column index when a new row starts
+            self.current_column = 0
         else:
-            self.current_column += 1  # Increment column index for each new button within the same row
-
-        # Add the button to the frame at the current row and the current column
-        button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
-
-        # Add the button's width to the current row width
+            self.current_column += 1
         self.current_row_width += button_width
 
-        # Add the button to the client_buttons dictionary
+    def add_button_to_grid_and_dict(self, button, client_name):
+        button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
         self.client_buttons[client_name] = button
 
+    def add_client_button(self, client_name):
+        button = self.create_button(client_name)
+        button_width = button.winfo_reqwidth()
+        self.calculate_position(button_width)
+        self.add_button_to_grid_and_dict(button, client_name)
+    
     def select_client(self, client_name):
-        #self.is_private = True
-        # Set the selected client
-        self.selected_client = client_name
+            self.selected_client = client_name
+            self.log_recipient(client_name)
 
     def update_client_dropdown(self):
         # Update client buttons
@@ -157,12 +156,14 @@ class ServerGUI:
             for conn in self.connections.values():
                 conn.close()
 
-            self.server_socket.close()
+            self.server_socket.close()# Cierra conexion con el socket
 
+            # Habilita y deshabilita los botones
             self.start_button.config(state=tk.NORMAL)
             self.stop_button.config(state=tk.DISABLED)
             self.message_text.config(state=tk.DISABLED)
             self.send_button.config(state=tk.DISABLED)
+            self.global_button.config(state=tk.DISABLED)
 
             self.status_label.config(text='Servidor detenido')
 
@@ -176,6 +177,12 @@ class ServerGUI:
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
         self.log_text.config(state='disabled')
+
+    def log_recipient(self, recipient):
+        self.messages_to_text.config(state='normal')
+        self.messages_to_text.delete('1.0', 'end')
+        self.messages_to_text.insert('end', recipient)
+        self.messages_to_text.config(state='disabled')
 
     # Modify your handle_connection method
     def handle_connection(self, client_socket, client_address, client_name):
@@ -199,7 +206,7 @@ class ServerGUI:
 
             message = data.decode().strip()  # Los datos se vuelven bits
 
-            if message == 'desconectado':
+            if message == 'DISCONNECT':
                 self.client_buttons[name].config(bg='red')
                 break
 

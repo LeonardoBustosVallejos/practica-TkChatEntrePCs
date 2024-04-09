@@ -36,7 +36,7 @@ class ClientGUI:
 
     def on_close(self):
         if self.connected:# Si esta conectado enviar mensaje de desconexion
-            self.socket.sendall('desconectado'.encode())
+            self.socket.sendall('DISCONNECT'.encode())
         self.master.destroy()# Cerrar la ventana
         
     def update_client_dropdown(self):
