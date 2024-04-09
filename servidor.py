@@ -18,20 +18,17 @@ class ServerGUI:
 
         # Create a variable to store the selected client
         self.selected_client = 'Global'
-        #self.is_private = False
-        #self.selected_client = None
 
         # Create a canvas and a scrollbar
-        self.canvas = tk.Canvas(master, width=265, height=250, bg='blue')
+        self.canvas = tk.Canvas(master, width=265, height=250, bg='white')
         self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
 
         # Configure the canvas to use the scrollbar
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
         # Create a frame to hold the buttons
-        self.buttons_frame = tk.Frame(self.canvas, bg='blue', padx=3, pady=3)
+        self.buttons_frame = tk.Frame(self.canvas, bg='white', padx=3, pady=3)
         self.buttons_per_row = 5
-        #self.buttons_frame.grid_propagate(False)
 
         # Add the frame to the canvas
         self.canvas.create_window((0, 0), window=self.buttons_frame, anchor='nw')
@@ -54,38 +51,31 @@ class ServerGUI:
         # Create a "Remove Offline" button
         self.remove_offline_button = tk.Button(master, text='Eliminar\nDesconectados', command=self.remove_offline)
         self.remove_offline_button.place_configure(x=580, y=310)
-        #self.remove_offline_button.pack()
 
         # Create a dictionary to store the client buttons
         self.client_buttons = {}
 
         # Estado del servidor
         self.status_label = tk.Label(master, text='Servidor detenido')
-        #self.status_label.pack()
         self.status_label.place_configure(x=180, y=15) 
         self.log_text = tk.Text(master, height=10, width=50)
         self.log_text.config(state='disabled')
-        #self.log_text.pack()
         self.log_text.place_configure(x=20, y=50)
 
         # Iniciar el server
         self.start_button = tk.Button(master, text='Iniciar', command=self.start_server)
-        #self.start_button.pack()
         self.start_button.place_configure(x=130, y=230)
 
         # Detener el server
         self.stop_button = tk.Button(master, text='Detener', command=self.stop_server, state=tk.DISABLED)
-        #self.stop_button.pack()
         self.stop_button.place_configure(x=230, y=230)
 
         # Texto para mensajes
         self.message_text = tk.Text(master, height=3, width=50)
-        #self.message_text.pack()
         self.message_text.place_configure(x=20, y=270)
 
         # Boton para enviar mensajes
         self.send_button = tk.Button(master, text='Enviar', command=self.send_message, state=tk.DISABLED)
-        #self.send_button.pack()
         self.send_button.place_configure(x=180, y=330)
 
 
@@ -95,46 +85,61 @@ class ServerGUI:
         self.connections = {}
 
     def add_client_button(self, client_name):
-        # Create a button for the client
-        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
+        # Create a Frame
+        frame = tk.Frame(self.buttons_frame, bg='white', padx=3, pady=3)
 
-        # Bind a click event to the button
+        # Create a Button
+        button = tk.Button(frame, text=client_name, width=12, height=1, anchor='w')
+        button.pack(fill='both', expand=True)  # Make the button fill the frame
         button.bind('<Button-1>', lambda e: self.select_client(client_name))
 
-        # Force Tkinter to update the button's width
-        button.update_idletasks()
+        # Create a Label for the square
+        square = tk.Label(frame, text=' ', bg='green', width=2)
+        square.place(relx=0.80, rely=0.5, anchor='w')  # Place the square at 10% from the left and 50% from the top
 
-        # Calculate the width of the new button
-        button_width = button.winfo_reqwidth()
+        # Add the Frame to the buttons_frame
+        frame.pack(fill='x')  # Make the frame fill the width of the buttons_frame
 
-        # If this is the first button or the width of the new button plus the width of the buttons in the current row exceeds the width of the canvas, start a new row
-        if not self.client_buttons or button_width + self.current_row_width > self.canvas_width:
+        # Force Tkinter to update the frame's width
+        frame.update_idletasks()
+
+        # Calculate the width of the new frame
+        frame_width = frame.winfo_reqwidth()
+
+        # If this is the first frame or the width of the new frame plus the width of the frames in the current row exceeds the width of the canvas, start a new row
+        if not self.client_buttons or frame_width + self.current_row_width > self.canvas_width:
             self.current_row += 1
             self.current_row_width = 0
             self.current_column = 0  # Reset column index when a new row starts
         else:
-            self.current_column += 1  # Increment column index for each new button within the same row
+            self.current_column += 1  # Increment column index for each new frame within the same row
 
-        # Add the button to the frame at the current row and the current column
-        button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
+        # Add the frame to the frame at the current row and the current column
+        frame.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
 
-        # Add the button's width to the current row width
-        self.current_row_width += button_width
+        # Add the frame's width to the current row width
+        self.current_row_width += frame_width
 
-        # Add the button to the client_buttons dictionary
-        self.client_buttons[client_name] = button
+        # Add the frame to the client_buttons dictionary
+        self.client_buttons[client_name] = (button, square)
 
     def select_client(self, client_name):
-        #self.is_private = True
         # Set the selected client
         self.selected_client = client_name
 
     def update_client_dropdown(self):
         # Update client buttons
-        for i, name in enumerate(self.connections.keys()):
-            if name not in self.client_buttons:
+        for client_name in self.connections.keys():
+            if client_name not in self.client_buttons:
                 # Create a new button for the client
-                self.add_client_button(name)
+                self.add_client_button(client_name)
+            else:
+                # Update the color of the square
+                button, square = self.client_buttons[client_name]
+                if client_name in self.connections:
+                    square.config(bg='green')
+                else:
+                    square.config(bg='red')
 
     def start_server(self):
         # Inicia el server
@@ -187,7 +192,8 @@ class ServerGUI:
         self.enable_text
         self.log(f'El usuario: {name} se ha conectado')
         if name in self.client_buttons:
-            self.client_buttons[name].config(bg='green')
+            button, square = self.client_buttons[name]
+            square.config(bg='green')
         self.disable_text
 
         while True:
@@ -200,7 +206,8 @@ class ServerGUI:
             message = data.decode().strip()  # Los datos se vuelven bits
 
             if message == 'desconectado':
-                self.client_buttons[name].config(bg='red')
+                button, square = self.client_buttons[name]
+                square.config(bg='red')
                 break
 
             if message == '':
@@ -259,8 +266,9 @@ class ServerGUI:
 
     def remove_offline(self):
         # Remove all offline clients from the list of client buttons
-        for name, button in list(self.client_buttons.items()):
+        for name, button_data in list(self.client_buttons.items()):
             if not self.connections.get(name):
+                button, _ = button_data  # Unpack the tuple
                 button.destroy()
                 del self.client_buttons[name]
 
