@@ -11,28 +11,103 @@ class ClientGUI:
     def __init__(self, master):
         self.master = master
         master.title('Cliente')
-
-        self.name = tk.StringVar()
-        self.name.set("Pato")
-
-        self.received_messages_text = tk.Text(master, height=10, width=50)
-        self.received_messages_text.pack()
-
-        self.message_entry = tk.Entry(master, width=50)
-        self.message_entry.pack()
-
-        self.name_entry = tk.Entry(master, width=50, textvariable=self.name)
-        self.name_entry.pack()
-
-        self.send_button = tk.Button(master, text='Enviar', command=self.send_message)
-        self.send_button.pack()
-
-        self.connected = False
-        self.connect_to_server()
-
+        master.geometry('800x380')
         # Al cerrar la ventana se detiene el cliente
         # y ejecuta la función on_close
         master.protocol("WM_DELETE_WINDOW", self.on_close)
+
+# ======================================= IZQUIERDA DE LA GUI =======================================
+        self.name = tk.StringVar()
+        self.name.set("Pato")
+
+        # Text para mostrar los mensajes
+        self.log_text = tk.Text(master, height=10, width=50, state=tk.DISABLED)# Por default el text es de solo lectura
+        self.log_text.place(x=20, y=50)
+
+        # Text para escribir los mensajes
+        self.message_text = tk.Text(master, height=3,width=50)
+        self.message_text.place(x=20, y=270)
+
+        # Label para el nombre del usuario
+        self.name_label = tk.Label(master, text='USUARIO: ')
+        self.name_label.place(x=170, y=15)
+        self.name_entry = tk.Label(master, textvariable=self.name)
+        self.name_entry.place(x=230, y = 15)
+
+        # Conectar al server
+        self.Connect_button = tk.Button(master, text='Conectar', state=tk.DISABLED)
+        self.Connect_button.place(x=130, y=230)
+
+        # Desconectar del server
+        self.connect_button = tk.Button(master, text='Desconectar')
+        self.connect_button.place(x=230, y=230)
+
+        self.send_button = tk.Button(master, text='Enviar', command=self.send_message)
+        self.send_button.place(x=180, y=330)
+# =================================================================================================
+
+# ======================================= DERECHA DE LA GUI =======================================
+
+        # Boton "Global"
+        self.global_button = tk.Button(master, text='Global', state=tk.DISABLED, command=lambda: self.select_client('Global'))
+        self.global_button.place(x=610, y=15)
+
+        # Canvas y scrollbar para los botones de los clientes
+        self.canvas = tk.Canvas(master, width=265, height=200, bg='white')
+        self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
+
+        # Configurar el canvas para que se pueda desplazar con la scrollbar
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+
+        # crea un frame para los botones
+        self.buttons_frame = tk.Frame(self.canvas, bg='white', padx=3, pady=3)
+        self.buttons_per_row = 5
+
+        # añade los botones al frame y los coloca en el canvas
+        self.canvas.create_window((0, 0), window=self.buttons_frame, anchor='nw')
+
+        # Coloca el canvas y la scrollbar en la ventana
+        self.canvas.place(x=500, y=50)
+        self.scrollbar.place(x=770, y=50, height=200)
+        self.current_row = 0
+        self.current_row_width = 0
+        self.canvas_width = 260 - 10
+
+        # Configurar el evento de desplazamiento del canvas para que se ajuste al tamaño del frame
+        self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
+
+        # Boton "Eliminar desconectados"
+        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados')
+        self.remove_offline_button.place(x=510, y=280)
+
+        # Diccionario de conexiones
+        self.client_buttons = {}
+
+        # Destinatarios
+        self.messages_to_label = tk.Label(master, text='Mensaje a:')
+        self.messages_to_label.place(x=620, y=260)
+        # Text para mostrar los destinatarios
+        self.messages_to_text = tk.Text(master, bg='#f0f0f0', height = 4, width=18, state=tk.DISABLED)
+        self.messages_to_text.place(x=620, y=280)
+# =================================================================================================
+
+# ======================================= VARIABLES DE LA GUI =======================================
+        # Iniciar la conexión con el servidor
+        self.connected = False
+        self.connect_to_server()
+# =================================================================================================
+
+    def enable_log(self):
+        self.log_text.config(state='normal')
+    
+    def disable_log(self):
+        self.log_text.config(state='disabled')
+
+    def log(self, message):
+        self.enable_log()
+        self.log_text.insert(tk.END, message + '\n')
+        self.log_text.see(tk.END)
+        self.disable_log()
 
     def on_close(self):
         if self.connected:# Si esta conectado enviar mensaje de desconexion
@@ -66,6 +141,7 @@ class ClientGUI:
                 self.receive_thread = Thread(target=self.receive_messages)
                 self.receive_thread.start()
 
+                self.log('Conectado al servidor')
                 break  # Si se conectó, salir del bucle
 
             except Exception as e:
@@ -88,8 +164,10 @@ class ClientGUI:
                     break
 
                 # Agregar el mensaje recibido a la caja de texto
-                self.received_messages_text.insert(tk.END, data.decode() + '\n')
-                self.received_messages_text.see(tk.END)
+                self.enable_log()
+                self.log_text.insert(tk.END, data.decode() + '\n')
+                self.log_text.see(tk.END)
+                self.disable_log()
 
             except Exception as e:
                 print(e)
@@ -99,7 +177,9 @@ class ClientGUI:
 
     def send_message(self):
         # Obtener el mensaje ingresado en el cuadro de texto
-        message = self.message_entry.get()
+        message = self.message_text.get('1.0', tk.END).strip()
+        
+        self.enable_log()
 
         # Verificar si estamos conectados al servidor
         if not self.connected:
@@ -112,10 +192,12 @@ class ClientGUI:
             self.socket.sendall(message.encode())
 
             # Borrar el cuadro de texto de mensaje
-            self.message_entry.delete(0, tk.END)
+            self.message_text.delete('1.0', tk.END)
         else:
             # Mostrar un mensaje de error si el socket está cerrado
             messagebox.showerror('Error', 'No se pudo enviar el mensaje: la conexión con el servidor se ha perdido.')
+        
+        self.disable_log()
 
 if __name__ == "__main__":
     root = tk.Tk()
