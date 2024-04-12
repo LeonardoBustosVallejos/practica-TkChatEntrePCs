@@ -35,12 +35,12 @@ class ClientGUI:
         self.name_entry.place(x=230, y = 15)
 
         # Conectar al server
-        self.Connect_button = tk.Button(master, text='Conectar', state=tk.DISABLED)
-        self.Connect_button.place(x=130, y=230)
+        self.connect_button = tk.Button(master, text='Conectar', state=tk.DISABLED, command=self.connect_to_server)
+        self.connect_button.place(x=130, y=230)
 
         # Desconectar del server
-        self.connect_button = tk.Button(master, text='Desconectar')
-        self.connect_button.place(x=230, y=230)
+        self.disconnect_button = tk.Button(master, text='Desconectar', state=tk.DISABLED, command=self.disconnect_from_server)
+        self.disconnect_button.place(x=230, y=230)
 
         self.send_button = tk.Button(master, text='Enviar', command=self.send_message)
         self.send_button.place(x=180, y=330)
@@ -130,6 +130,8 @@ class ClientGUI:
             self.client_list.insert(tk.END, client)
 
     def connect_to_server(self):
+        max_retries = 5
+        retries = 0
         while True:
             try:
                 # Crear un objeto de socket TCP
@@ -149,6 +151,8 @@ class ClientGUI:
                 self.receive_thread.start()
 
                 self.log('Conectado al servidor')
+                self.connect_button.config(state=tk.DISABLED)
+                self.disconnect_button.config(state=tk.NORMAL)
                 break  # Si se conectó, salir del bucle
 
             except Exception as e:
@@ -159,6 +163,24 @@ class ClientGUI:
 
                 # Esperar 5 segundos antes de intentar reconectar
                 time.sleep(5)
+                retries += 1
+        if retries == max_retries:
+            self.log('No se pudo conectar al servidor después de varios intentos')
+
+    def disconnect_from_server(self):
+        # Enviar mensaje de desconexión al servidor
+        self.socket.sendall('DISCONNECT'.encode())
+        self.connected = False
+        self.socket.close()
+        self.log('Desconectado del servidor')
+        self.connect_button.config(state=tk.NORMAL)
+        self.disconnect_button.config(state=tk.DISABLED)
+        self.global_button.config(state=tk.DISABLED)
+        self.remove_offline_button.config(state=tk.DISABLED)
+        self.messages_to_text.config(state=tk.DISABLED)
+        #self.client_list.config(state=tk.DISABLED)
+        self.message_text.config(state=tk.DISABLED)
+        self.send_button.config(state=tk.DISABLED)
 
     def receive_messages(self):
         while self.connected:

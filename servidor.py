@@ -139,8 +139,8 @@ class ServerGUI:
 
         self.status_label.config(text='Servidor corriendo')
 
-        self.select_client('Global')    
-        self.log_recipient('Global')
+        self.select_client('Global')# Selecciona el cliente global    
+        self.log_recipient('Global')# Muestra los destinatarios en la ventana de messages_to_text
 
     # Servidor corriendo en un hilo separado para no bloquear la GUI
     def run_server(self):
@@ -297,6 +297,7 @@ class ServerGUI:
         self.log(f'Conexion cerrada con {name}')# Muestra el mensaje en la ventana de log     
         self.disable_text()
     # =================================================================================================
+
     # ======================= BOTONES =======================
     # Crear un botón para un cliente
     def create_button(self, client_name):
