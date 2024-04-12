@@ -184,7 +184,7 @@ class ServerGUI:
 
             for conn in self.connections.values():
                 try:
-                    conn.close()
+                    conn.close()# Cierra la conexion con el cliente
                 except Exception as e:
                     print(f'Error closing connection: {e}')
 
@@ -208,6 +208,30 @@ class ServerGUI:
 # =================================================================================================
 
 # ==================================== FUNCIONES DE LOS CLIENTES ====================================
+    # ======================= SELECCIONAR CLIENTE =======================
+    def select_client(self, client_name):
+        if client_name == 'Global':
+            self.selected_clients.clear()
+            self.selected_client = 'Global'
+        else:
+            # If the client is in the list of selected clients, remove it
+            if client_name in self.selected_clients:
+                self.selected_clients.remove(client_name)
+            else:
+                # If the client is not in the list of selected clients, add it
+                self.selected_clients.append(client_name)
+
+            # If there are no selected clients, select 'Global'
+            if len(self.selected_clients) == 0:
+                self.selected_client = 'Global'
+            else:
+                # If there are selected clients, select the first one in the list
+                self.selected_client = self.selected_clients[0]
+
+        print(f'Se selecciono a {self.selected_clients}')
+        self.log_recipient(self.selected_clients)
+    # =================================================================================================
+
     # ======================= CONEXIONES =======================
 
     # actualizar el menu de conectados
@@ -313,44 +337,7 @@ class ServerGUI:
                 button.destroy()# Elimina el botón
                 del self.client_buttons[name]# Elimina el botón del diccionario de botones
     # =================================================================================================
-    # ======================= SELECCIONAR CLIENTE =======================
-    # Seleccionar un cliente
-    def select_client(self, client_name):
-        if client_name == 'Global':# Si el cliente es global
-            self.selected_clients.clear()# Limpia la lista de clientes seleccionados
-            self.selected_client = 'Global'# Selecciona el cliente global
-        else:
-            # Si el cliente no esta en la lista de clientes seleccionados lo añade
-            if client_name in self.selected_clients:
-                self.selected_clients.remove(client_name)
-            else:
-            # Si el cliente esta en la lista de clientes seleccionados lo elimina
-                self.selected_clients.append(client_name)
-
-            # Si no hay clientes seleccionados selecciona el cliente global
-            if len(self.selected_clients) == 0:
-                self.selected_client = 'Global'
-        # Muestra los destinatarios en la ventana de messages_to_text
-        self.log_recipient(self.selected_clients)
-    # =================================================================================================
-
     # ======================= ENVIAR MENSAJE =======================
-    # Enviar un mensaje
-    def send_message(self):
-        # Obtiene el mensaje
-        message = self.message_text.get('1.0', 'end').strip()
-        self.message_text.delete('1.0', 'end')
-
-        # Si el mensaje esta vacio no hace nada
-        if message == '':
-            return
-
-        # Si el cliente seleccionado es global envia el mensaje a todos los clientes
-        if self.selected_client == 'Global':
-            self.send_global_message(message)
-        # Si el cliente seleccionado no es global envia el mensaje al cliente seleccionado
-        else:
-            self.send_private_message(message)# Envia el mensaje al cliente seleccionado
 
     # Mensaje global
     def send_global_message(self, message):
@@ -380,6 +367,22 @@ class ServerGUI:
         except Exception as e:
             self.log(f'Error sending message to {client}: {e}')
             self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
+    # Enviar un mensaje
+    def send_message(self):
+        # Obtiene el mensaje
+        message = self.message_text.get('1.0', 'end').strip()
+        self.message_text.delete('1.0', 'end')
+
+        # Si el mensaje esta vacio no hace nada
+        if message == '':
+            return
+
+        # Si el cliente seleccionado es global envia el mensaje a todos los clientes
+        if self.selected_client == 'Global':
+            self.send_global_message(message)
+        # Si el cliente seleccionado no es global envia el mensaje al cliente seleccionado
+        else:
+            self.send_private_message(message)# Envia el mensaje al cliente seleccionado
     #   =================================================================================================
 
 root = tk.Tk()

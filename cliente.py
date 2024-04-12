@@ -80,9 +80,6 @@ class ClientGUI:
         self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados')
         self.remove_offline_button.place(x=510, y=280)
 
-        # Diccionario de conexiones
-        self.client_buttons = {}
-
         # Destinatarios
         self.messages_to_label = tk.Label(master, text='Mensaje a:')
         self.messages_to_label.place(x=620, y=260)
@@ -92,22 +89,32 @@ class ClientGUI:
 # =================================================================================================
 
 # ======================================= VARIABLES DE LA GUI =======================================
-        # Iniciar la conexión con el servidor
+        # Variable para saber si esta conectado
         self.connected = False
+        # Botones de los clientes
+        self.client_buttons = {}
+        # Guardar las conexiones
+        self.connections = {}
+        # clientes seleccionados para enviar mensajes
+        self.selected_clients = []
+        # Conectar al servidor
         self.connect_to_server()
 # =================================================================================================
 
+# ===================================== FUNCIONES UTILITARIAS =====================================
+    # Habilitar la caja de texto de log
     def enable_log(self):
         self.log_text.config(state='normal')
-    
+    # Deshabilitar la caja de texto de log
     def disable_log(self):
         self.log_text.config(state='disabled')
-
+    # Agregar un mensaje a la caja de texto de log
     def log(self, message):
         self.enable_log()
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
         self.disable_log()
+# =================================================================================================
 
     def on_close(self):
         if self.connected:# Si esta conectado enviar mensaje de desconexion
