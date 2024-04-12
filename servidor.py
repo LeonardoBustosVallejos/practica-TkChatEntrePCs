@@ -16,9 +16,6 @@ class ServerGUI:
 
         self.client_var = tk.StringVar()
 
-        # Create a variable to store the selected client
-        self.selected_client = 'Global'
-
         # Create a canvas and a scrollbar
         self.canvas = tk.Canvas(master, width=265, height=200, bg='white')
         self.scrollbar = tk.Scrollbar(master, command=self.canvas.yview)
@@ -98,6 +95,8 @@ class ServerGUI:
         self.server_running = False
         # Guardar las conexiones
         self.connections = {}
+        # clientes seleccionados para enviar mensajes
+        self.selected_clients = []
 
     def create_button(self, client_name):
         button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
@@ -123,10 +122,23 @@ class ServerGUI:
         button_width = button.winfo_reqwidth()
         self.calculate_position(button_width)
         self.add_button_to_grid_and_dict(button, client_name)
-    
+
     def select_client(self, client_name):
-            self.selected_client = client_name
-            self.log_recipient(client_name)
+        if client_name == 'Global':
+            self.selected_clients.clear()
+            self.selected_client = 'Global'
+        else:
+            if client_name in self.selected_clients:
+                self.selected_clients.remove(client_name)
+            else:
+                self.selected_clients.append(client_name)
+            # Update selected_client when a specific client is selected
+            if len(self.selected_clients) == 0:
+                self.selected_client = 'Global'
+            else:
+                self.selected_client = self.selected_clients[-1]
+        print(f'Los clientes a los que deberian enviarse mensajes: {self.selected_clients}')
+        self.log_recipient(self.selected_clients)
 
     def update_client_dropdown(self):
         # Update client buttons
@@ -148,15 +160,24 @@ class ServerGUI:
 
         self.status_label.config(text='Servidor corriendo')
 
+        self.select_client('Global')    
+        self.log_recipient('Global')
+
     def stop_server(self, close_gui=False):
         if self.server_running:
             # Detiene el server
             self.server_running = False # El server ya no esta corriendo
 
             for conn in self.connections.values():
-                conn.close()
+                try:
+                    conn.close()
+                except Exception as e:
+                    print(f'Error closing connection: {e}')
 
-            self.server_socket.close()# Cierra conexion con el socket
+            try:
+                self.server_socket.close()# Cierra conexion con el socket
+            except Exception as e:
+                print(f'Error closing server socket: {e}')
 
             # Habilita y deshabilita los botones
             self.start_button.config(state=tk.NORMAL)
@@ -179,6 +200,8 @@ class ServerGUI:
         self.log_text.config(state='disabled')
 
     def log_recipient(self, recipient):
+        if not recipient:
+            recipient = 'Global'
         self.messages_to_text.config(state='normal')
         self.messages_to_text.delete('1.0', 'end')
         self.messages_to_text.insert('end', recipient)
@@ -191,13 +214,13 @@ class ServerGUI:
         self.log(f'Cliente {name} conectado.')
         self.global_button.config(state='normal')  # Enable the 'Global' button
 
-        self.enable_text
+        self.enable_text()
         self.log(f'El usuario: {name} se ha conectado')
         if name in self.client_buttons:
             self.client_buttons[name].config(bg='green')
-        self.disable_text
+        self.disable_text()
 
-        while True:
+        while self.server_running:
             try:  # Add try-except block for debugging
                 data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
             except Exception as e:
@@ -213,9 +236,9 @@ class ServerGUI:
             if message == '':
                 continue
 
-            self.enable_text
+            self.enable_text()
             self.log(f'Datos de {name}: {message}')
-            self.disable_text
+            self.disable_text()
 
             try:  # Add try-except block for debugging
                 response = f'Datos enviados: {message}'.encode()
@@ -227,36 +250,41 @@ class ServerGUI:
         client_socket.close()
         del self.connections[name]
         self.master.after(0, self.update_client_dropdown)  # Actualiza el menu de conectados
-        self.enable_text
+        self.enable_text()
         self.log(f'Conexion cerrada con {name}')        
-        self.disable_text
-    
+        self.disable_text()
+
     def send_message(self):
         message = self.message_text.get('1.0', 'end').strip()
         self.message_text.delete('1.0', 'end')
         if message == '':
             return
-        if self.global_button.config('relief')[-1] == 'sunken' or self.selected_client == 'Global':
-            self.enable_text
+        if self.selected_client == 'Global':
+            self.enable_text()
             self.log(f'Mensaje global: {message}')
-            # If the 'Global' button is pressed or the selected client is 'Global', send the message to all clients
+            # If the 'Global' button is pressed, send the message to all clients
             for client_socket in self.connections.values():
-                self.disable_text
+                self.disable_text()
                 message_aux = f'Mensaje global: {message}'
                 client_socket.sendall(message_aux.encode())
         else:
             # If a client's button is pressed, send the message to that client only
-            selected_client = self.selected_client
-            if self.connections.get(selected_client):
-                self.enable_text
-                self.log(f'Mensaje a {selected_client}: {message}')
-                message_aux = f'Mensaje privado: {message}'
-                self.disable_text
-                self.connections[selected_client].sendall(message_aux.encode())
-            else:
-                self.enable_text
-                self.log(f'{selected_client} no está conectado')
-                self.disable_text
+            for selected_client in self.selected_clients[:]:  # Iterate over a copy of the list
+                if self.connections.get(selected_client):
+                    self.enable_text()
+                    self.log(f'Mensaje a {selected_client}: {message}')
+                    message_aux = f'Mensaje privado: {message}'
+                    self.disable_text()
+                    try:
+                        self.connections[selected_client].sendall(message_aux.encode())
+                    except Exception as e:
+                        self.log(f'Error sending message to {selected_client}: {e}')
+                        self.selected_clients.remove(selected_client)  # Remove the client from the list if disconnected
+                else:
+                    self.enable_text()
+                    self.log(f'{selected_client} no está conectado')
+                    self.selected_clients.remove(selected_client)  # Remove the client from the list if disconnected
+                    self.disable_text()
 
     def disable_text(self):
         self.log_text.config(state='disabled')

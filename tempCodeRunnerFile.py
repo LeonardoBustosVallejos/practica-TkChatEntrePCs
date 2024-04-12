@@ -1,27 +1,29 @@
-    def create_button(self, client_name):
-        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
-        button.bind('<Button-1>', lambda e: self.select_client(client_name))
-        button.update_idletasks()
-        return button
 
-    def calculate_position(self, button_width):
-        if not self.client_buttons or button_width + self.current_row_width > self.canvas_width:
-            self.current_row += 1
-            self.current_row_width = 0
-            self.current_column = 0
-        else:
-            self.current_column += 1
-        self.current_row_width += button_width
+    def stop_server(self, close_gui=False):
+        if self.server_running:
+            # Detiene el server
+            self.server_running = False # El server ya no esta corriendo
 
-    def add_button_to_grid_and_dict(self, button, client_name):
-        button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
-        self.client_buttons[client_name] = button
+            for conn in self.connections.values():
+                try:
+                    conn.close()
+                except Exception as e:
+                    print(f'Error closing connection: {e}')
 
-    def add_client_button(self, client_name):
-        button = self.create_button(client_name)
-        button_width = button.winfo_reqwidth()
-        self.calculate_position(button_width)
-        self.add_button_to_grid_and_dict(button, client_name)
-        def select_client(self, client_name):
-            self.selected_client = client_name
-            self.log_recipient(client_name)
+            try:
+                self.server_socket.close()# Cierra conexion con el socket
+            except Exception as e:
+                print(f'Error closing server socket: {e}')
+
+            # Habilita y deshabilita los botones
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            self.message_text.config(state=tk.DISABLED)
+            self.send_button.config(state=tk.DISABLED)
+            self.global_button.config(state=tk.DISABLED)
+
+            self.status_label.config(text='Servidor detenido')
+
+        # Cierra la ventana si se presiono el boton de cerrar
+        if close_gui:
+            self.master.destroy()
