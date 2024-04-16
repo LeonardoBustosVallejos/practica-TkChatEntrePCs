@@ -33,3 +33,25 @@ COMO HACERLO:
 - Si la lista de destinatarios está vacía, entonces es un mensaje "global".
 - Si se elige la opcion "global", entonces se elimina el resto de destinatarios, quedando solamente "global".
 - Si se elige un destinatario, estando "global" dentro de la lista de destinatarios, se elimina "global" en la lista de destinatarios.
+
+
+To achieve the desired functionality, you need to make changes in both the client and server code. Here's a step-by-step plan:
+
+1) Modify the server code to keep track of all connected clients. When a new client connects, the server should send a message to all clients that a new client was connected.
+
+2) Modify the client code to handle the updated list of connected clients message from the server. When this message is received, the client should update its list of connected clients and the corresponding buttons.
+
+3) Add a "Global" button in the client GUI. This button should be always enabled and cannot be removed.
+
+4) Modify the client code to allow multiple selections of client buttons. When a client button is selected, the client should send a message to the server indicating the selected clients.
+
+5) Modify the server code to handle the selected clients message from the client. The server should send the message to the respective clients.
+
+6) Modify the client code to handle the case when the same client is selected again. In this case, the client should be removed from the recipient list.
+
+7) Modify the client code to handle the case when the recipient list is empty. In this case, the message should be sent to all clients.
+
+8) Modify the client code to handle the case when the "Global" button is selected. In this case, all other recipients should be removed from the recipient list.
+
+9) Modify the client code to handle the case when a recipient is selected while "Global" is in the recipient list. In this case, "Global" should be removed from the recipient list.
+

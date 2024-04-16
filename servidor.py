@@ -260,10 +260,12 @@ class ServerGUI:
     def handle_connection(self, client_socket, client_address, client_name):
         self.initialize_connection(client_name)
         self.process_messages(client_socket, client_name)
+        self.send_system_message(f'Cliente {client_name} se ha desconectado.')
         self.terminate_connection(client_socket, client_name)
 
     def initialize_connection(self, client_name):
-        self.log(f'Cliente {client_name} se haconectado.')
+        self.send_system_message(f'Cliente {client_name} se ha conectado')# Muestra el mensaje en la ventana de log
+        self.log(f'Cliente {client_name} se ha conectado.')
         self.global_button.config(state='normal')  # Habilita el botón global
         if client_name in self.client_buttons:
             self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
@@ -276,7 +278,7 @@ class ServerGUI:
                 break
             if message != '':
                 self.log(f'Datos de {client_name}: {message}')# Muestra el mensaje en la ventana de log
-                self.send_message(client_socket, message)
+                self.send_message(message)# Envia el mensaje a todos los clientes
 
     def terminate_connection(self, client_socket, client_name):
         client_socket.close() # Cierra la conexion con el cliente
@@ -291,13 +293,6 @@ class ServerGUI:
             print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
             return 'DISCONNECT'
         return data.decode().strip()  # Los datos se vuelven bits
-
-    def send_message(self, client_socket, message):
-        try:  # Agregar un bloque try-except para depuración
-            response = f'Datos enviados: {message}'.encode()
-            client_socket.sendall(response)
-        except Exception as e:
-            print(f'Error sending data: {e}')  # Linea de depuración, se puede eliminar
     # =================================================================================================
 
     # ======================= BOTONES =======================
@@ -334,14 +329,28 @@ class ServerGUI:
 
     # Eliminar clientes desconectados
     def remove_offline(self):
-        # Elimina los clientes desconectados
-        for name, button in list(self.client_buttons.items()):
-            if not self.connections.get(name):# Si el cliente no esta conectado
-                button.destroy()# Elimina el botón
-                del self.client_buttons[name]# Elimina el botón del diccionario de botones
+        # Create a copy of the keys
+        client_names = list(self.client_buttons.keys())
+        # Iterate over the copy
+        for name in client_names:
+            if not self.connections.get(name):# If the client is not connected
+                self.client_buttons[name].destroy()# Remove the button
+                del self.client_buttons[name]# Remove the button from the dictionary
     # =================================================================================================
 
     # ======================= ENVIAR MENSAJE =======================
+
+    # Enviar un mensaje del sistema a todos los clientes
+    def send_system_message(self, message):
+        disconnected_clients = []
+        for client_name, client in self.connections.items():
+            try:
+                client.sendall(message.encode())
+            except ConnectionResetError:
+                disconnected_clients.append(client_name)
+
+        for client_name in disconnected_clients:
+            del self.connections[client_name]
 
     # Mensaje global
     def send_global_message(self, message):
@@ -371,22 +380,23 @@ class ServerGUI:
         except Exception as e:
             self.log(f'Error sending message to {client}: {e}')
             self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
-    # Enviar un mensaje
-    def send_message(self):
-        # Obtiene el mensaje
-        message = self.message_text.get('1.0', 'end').strip()
-        self.message_text.delete('1.0', 'end')
 
-        # Si el mensaje esta vacio no hace nada
+    def send_message(self, message=None):
+        # If no message argument is provided, get the message from self.message_text
+        if message is None:
+            message = self.message_text.get('1.0', 'end').strip()
+            self.message_text.delete('1.0', 'end')
+
+        # If the message is empty, do nothing
         if message == '':
             return
 
-        # Si el cliente seleccionado es global envia el mensaje a todos los clientes
+        # If the selected client is 'Global', send the message to all clients
         if self.selected_client == 'Global':
             self.send_global_message(message)
-        # Si el cliente seleccionado no es global envia el mensaje al cliente seleccionado
+        # If the selected client is not 'Global', send the message to the selected client
         else:
-            self.send_private_message(message)# Envia el mensaje al cliente seleccionado
+            self.send_private_message(message)
     #   =================================================================================================
 
 root = tk.Tk()

@@ -157,6 +157,12 @@ class ClientGUI:
                 self.log('Conectado al servidor')
                 self.connect_button.config(state=tk.DISABLED)
                 self.disconnect_button.config(state=tk.NORMAL)
+                self.global_button.config(state=tk.NORMAL)
+                self.remove_offline_button.config(state=tk.NORMAL)
+                self.messages_to_text.config(state=tk.NORMAL)
+                self.message_text.config(state=tk.DISABLED)
+                self.send_button.config(state=tk.DISABLED)
+                
                 break  # Si se conectó, salir del bucle
 
             except Exception as e:
@@ -183,7 +189,6 @@ class ClientGUI:
         self.global_button.config(state=tk.DISABLED)
         self.remove_offline_button.config(state=tk.DISABLED)
         self.messages_to_text.config(state=tk.DISABLED)
-        #self.client_list.config(state=tk.DISABLED)
         self.message_text.config(state=tk.DISABLED)
         self.send_button.config(state=tk.DISABLED)
 
@@ -196,7 +201,7 @@ class ClientGUI:
                 # Si no hay datos, el servidor cerró la conexión
                 if not data:
                     self.log('Conexión perdida con el servidor')
-                    self.connected = False
+                    self.disconnect_from_server()
                     break
 
                 # Agregar el mensaje recibido a la caja de texto
