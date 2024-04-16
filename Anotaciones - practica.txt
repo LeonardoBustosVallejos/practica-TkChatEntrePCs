@@ -24,25 +24,12 @@ DETALLES:
 	* Si fue a uno en especifico dira: "De {USER_SEND} A {USER_REC}: {MESSAGE}". SOLO los involucrados lo podran ver (Server incluido).
 	* El servidor también puede ser seleccionado como un Usuario para enviar mensajes.
 
-
--> IMPORTANTE:
-AMBOS:
-	* SE AMPLIARA EL ANCHO DE LA PANTALLA DEL PROGRAMA, DIVIDIENDOLO EN 2 PARTES.
-	* LA PARTE DERECHA SE MANTENDRA COMO ESTA ACTUALMENTE.
-	* LA PARTE IZQUIERDA SERÁ EXCLUSIVAMENTE PARA NUEVAS CONEXIONES.
-	* ACTUALIZAR LA ELECCION DE USUARIOS PARA ENVIAR MENSAJES, EN VEZ DE UN MENU DE OPCIONES SERÁN BOTONES QUE APARECERAN DENTRO DE UN ESPACIO DELIMITADO.
-	* ESTOS BOTONES TENDRÁN EL NOMBRE DEL USUARIO CONECTADO AL CUAL REPRESENTAN.
-	* A LA DERECHA DEL NOMBRE, HABRÁ UN CUADRADO, DIBUJADO POR EL PROPIO PROGRAMA, DE COLOR ROJO O VERDE.
-	* EL COLOR VERDE CORRESPONDE SI EL USUARIO ESTA CONECTADO.
-	* EL COLOR ROJO CORRESPONDE SI EL USUARIO ESTA DESCONECTADO.
-	* AHORA, LA OPCION "GLOBAL" SERÁ UNA OPCION QUE APARECE EN EL CUADRO DE LA IZQUIERDA.
-	* EN VEZ DE UN MENU, LOS NUEVOS USUARIOS APARECERAN BOTONES QUE APARECEN EN LA PARTE IZQUIERDA DE LA PANTALLA.
-	* HACIENDO CLICK SE CAMBIARA EL COLOR DEL BOTON A UN TONO MAS OSCURO, SEÑALANDO QUE ESE CLIENTE FUE FUE ELEGIDO PARA ENVIARLE UN MENSAJE.
-	* HACER CLICK UNA SEGUNDA VEZ SOBRE ESE USUARIO HARA QUE VUELVA A LA NORMALIDAD Y NO SE LE ENVIA UN MENSAJE.
-	* CUANDO UN CLIENTE SE DESCONECTE Y SE INTENTE ENVIAR UN MENSAJE, LA OPCION QUEDA ELIMINADA.
-	* AGREGAR UN BOTÓN DE "ELIMINAR DESCONECTADOS". AL HACER CLICK EN ESE BOTON SE ELIMINAN COMO OPCIONES A LOS USUARIOS DESCONECTADOS.
-
-CLIENTE:
-	* AGREGAR UN BOTON DE "RECONECTAR", QUE NORMALMENTE ESTARÁ DESHABILITADO
-	* SOLO SE ACTIVARÁ EL BOTÓN CUANDO EL SERVIDOR SE CALLO (SE DESCONECTO)
-	* AL PRESIONARLO VOLVERÁ A INTENTAR LA CONEXIÓN, SI 5 SEGUNDOS DESPUÉS NO HUBO RESPUESTA LANZA UN MENSAJE DE ERROR.
+COMO HACERLO:
+- Cuando un cliente se conecta con el servidor, el servidor envía un mensaje de todos los clientes conectados actualmente. Los clientes reciben ese mensaje y actualizan la lista de conectados, actualizando así los botones con sus respectivas conexiones.
+- Cuando un cliente se desconecta del servidor, el servidor envía un mensaje de todos los clientes conectados actualmente. Los clientes reciben ese mensaje y actualizan la lista de conectados, actualizando así los botones con sus respectivas conexiones.
+- Los clientes tienen un boton, el cual conecta con el servidor. Funciona igual que el resto de botones, pero ese es inamovible, lo cual significa que al presionar el boton "Eliminar Desconectados", este no eliminra el boton del servidor, si está desconectado.
+- Los clientes pueden seleccionar uno o mas botones de clientes. Al presionarlos enviaran un mensaje al servidor. El servidor recibe los menssajes y los envia a los respectivos usuarios.
+- Si el cliente elige el mismo cliente, este se elimina de la lista de destinatarios.
+- Si la lista de destinatarios está vacía, entonces es un mensaje "global".
+- Si se elige la opcion "global", entonces se elimina el resto de destinatarios, quedando solamente "global".
+- Si se elige un destinatario, estando "global" dentro de la lista de destinatarios, se elimina "global" en la lista de destinatarios.

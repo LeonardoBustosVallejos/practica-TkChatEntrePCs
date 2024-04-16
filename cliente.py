@@ -20,19 +20,15 @@ class ClientGUI:
         self.name = tk.StringVar()
         self.name.set("Pato")
 
-        # Text para mostrar los mensajes
-        self.log_text = tk.Text(master, height=10, width=50, state=tk.DISABLED)# Por default el text es de solo lectura
-        self.log_text.place(x=20, y=50)
-
-        # Text para escribir los mensajes
-        self.message_text = tk.Text(master, height=3,width=50)
-        self.message_text.place(x=20, y=270)
-
         # Label para el nombre del usuario
         self.name_label = tk.Label(master, text='USUARIO: ')
         self.name_label.place(x=170, y=15)
         self.name_entry = tk.Label(master, textvariable=self.name)
         self.name_entry.place(x=230, y = 15)
+
+        # Text para mostrar los mensajes
+        self.log_text = tk.Text(master, height=10, width=50, state=tk.DISABLED)# Por default el text es de solo lectura
+        self.log_text.place(x=20, y=50)
 
         # Conectar al server
         self.connect_button = tk.Button(master, text='Conectar', state=tk.DISABLED, command=self.connect_to_server)
@@ -41,9 +37,17 @@ class ClientGUI:
         # Desconectar del server
         self.disconnect_button = tk.Button(master, text='Desconectar', state=tk.DISABLED, command=self.disconnect_from_server)
         self.disconnect_button.place(x=230, y=230)
+        
+        # Texto de mensaje
+        self.message_label = tk.Label(master, text='Mensaje:')
+        self.message_label.place_configure(x=180, y = 265)
+
+        # Text para escribir los mensajes
+        self.message_text = tk.Text(master, height=3,width=50)
+        self.message_text.place(x=20, y=290)
 
         self.send_button = tk.Button(master, text='Enviar', command=self.send_message)
-        self.send_button.place(x=180, y=330)
+        self.send_button.place(x=180, y=347)
 # =================================================================================================
 
 # ======================================= DERECHA DE LA GUI =======================================
@@ -81,7 +85,7 @@ class ClientGUI:
         self.remove_offline_button.place(x=510, y=280)
 
         # Destinatarios
-        self.messages_to_label = tk.Label(master, text='Mensaje a:')
+        self.messages_to_label = tk.Label(master, text='Dirigido a:')
         self.messages_to_label.place(x=620, y=260)
         # Text para mostrar los destinatarios
         self.messages_to_text = tk.Text(master, bg='#f0f0f0', height = 4, width=18, state=tk.DISABLED)
@@ -130,7 +134,7 @@ class ClientGUI:
             self.client_list.insert(tk.END, client)
 
     def connect_to_server(self):
-        max_retries = 5
+        max_retries = 3
         retries = 0
         while True:
             try:
@@ -164,8 +168,9 @@ class ClientGUI:
                 # Esperar 5 segundos antes de intentar reconectar
                 time.sleep(5)
                 retries += 1
-        if retries == max_retries:
-            self.log('No se pudo conectar al servidor después de varios intentos')
+                if retries == max_retries:
+                    self.log('No se pudo conectar al servidor después de varios intentos')
+                    break
 
     def disconnect_from_server(self):
         # Enviar mensaje de desconexión al servidor
@@ -190,6 +195,8 @@ class ClientGUI:
 
                 # Si no hay datos, el servidor cerró la conexión
                 if not data:
+                    self.log('Conexión perdida con el servidor')
+                    self.connected = False
                     break
 
                 # Agregar el mensaje recibido a la caja de texto

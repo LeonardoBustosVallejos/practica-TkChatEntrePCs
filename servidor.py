@@ -32,13 +32,17 @@ class ServerGUI:
         self.stop_button = tk.Button(master, text='Detener', command=self.stop_server, state=tk.DISABLED)
         self.stop_button.place_configure(x=230, y=230)
 
-        # Texto para mensajes
+        # Texto de mensaje
+        self.message_label = tk.Label(master, text='Mensaje:')
+        self.message_label.place_configure(x=180, y = 265)
+
+        # Texto para escribir los mensajes
         self.message_text = tk.Text(master, height=3, width=50)
-        self.message_text.place_configure(x=20, y=270)
+        self.message_text.place_configure(x=20, y=290)
 
         # Boton para enviar mensajes
         self.send_button = tk.Button(master, text='Enviar', command=self.send_message, state=tk.DISABLED)
-        self.send_button.place_configure(x=180, y=330)
+        self.send_button.place_configure(x=180, y=347)
 # =================================================================================================
 
 # ======================================= DERECHA DE LA GUI =======================================
@@ -76,7 +80,7 @@ class ServerGUI:
         self.remove_offline_button.place(x=510, y=280)
 
         # Destinatarios
-        self.messages_to_label = tk.Label(master, text='Mensaje a:')
+        self.messages_to_label = tk.Label(master, text='Dirigido a:')
         self.messages_to_label.place(x=620, y=260)
 
         # Text para mostrar los destinatarios
@@ -109,10 +113,10 @@ class ServerGUI:
 
 # La función log() se encarga de mostrar mensajes en la ventana de log_text.
     def log(self, message):
-        self.log_text.config(state='normal')
+        self.enable_text()
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
-        self.log_text.config(state='disabled')
+        self.disable_text()
 
 # La función log_recipient() se encarga de mostrar los destinatarios en la ventana de messages_to_text.
     def log_recipient(self, recipient):
@@ -170,7 +174,7 @@ class ServerGUI:
             data = conn.recv(1024)
             name = data.decode().strip()
             self.connections[name] = conn  # Guarda la direccion bajo el nombre del cliente
-            self.update_client_dropdown()  
+            self.update_client_buttons()  
 
             # Crear un hilo para manejar la conexión entrante
             t = threading.Thread(target=self.handle_connection, args=(conn, addr, name))
@@ -228,74 +232,72 @@ class ServerGUI:
                 # If there are selected clients, select the first one in the list
                 self.selected_client = self.selected_clients[0]
 
-        print(f'Se selecciono a {self.selected_clients}')
         self.log_recipient(self.selected_clients)
     # =================================================================================================
 
     # ======================= CONEXIONES =======================
-
     # actualizar el menu de conectados
-    def update_client_dropdown(self):
+    def update_client_buttons(self):
         # actualiza los clientes conectados
-        for i, name in enumerate(self.connections.keys()):
-            if name not in self.client_buttons:
-                # Crea un boton para el cliente
-                self.add_client_button(name)
-    
+        for name in self.connections.keys():
+            self.add_client_button_if_not_exists(name)
+
+    def add_client_button_if_not_exists(self, name):
+        if name not in self.client_buttons:
+            # Crea un boton para el cliente
+            self.add_client_button(name)
+
     # desconectar un cliente
     def handle_disconnected_client(self, client):
-        self.enable_text()
         self.log(f'{client} no está conectado')
-        self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
+        self.remove_selected_client(client)
         self.log_recipient(self.selected_clients)# Muestra los destinatarios en la ventana de messages_to_text
-        self.disable_text()
+
+    def remove_selected_client(self, client):
+        self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
 
     # Manejar la conexión con un cliente
     def handle_connection(self, client_socket, client_address, client_name):
-        name = client_name
+        self.initialize_connection(client_name)
+        self.process_messages(client_socket, client_name)
+        self.terminate_connection(client_socket, client_name)
 
-        self.log(f'Cliente {name} conectado.')
+    def initialize_connection(self, client_name):
+        self.log(f'Cliente {client_name} se haconectado.')
         self.global_button.config(state='normal')  # Habilita el botón global
+        if client_name in self.client_buttons:
+            self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
 
-        self.enable_text()
-        self.log(f'El usuario: {name} se ha conectado')
-        if name in self.client_buttons:
-            self.client_buttons[name].config(bg='green') # Cambia el color del botón a verde
-        self.disable_text()
-
+    def process_messages(self, client_socket, client_name):
         while self.server_running:
-            try:  # Agregar un bloque try-except para depuración
-                data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
-            except Exception as e:
-                print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
-                break
-
-            message = data.decode().strip()  # Los datos se vuelven bits
-
+            message = self.receive_message(client_socket)
             if message == 'DISCONNECT': # Si el mensaje es desconectar
-                self.client_buttons[name].config(bg='red')# Cambia el color del botón a rojo
+                self.client_buttons[client_name].config(bg='red')# Cambia el color del botón a rojo
                 break
+            if message != '':
+                self.log(f'Datos de {client_name}: {message}')# Muestra el mensaje en la ventana de log
+                self.send_message(client_socket, message)
 
-            if message == '':
-                continue
-
-            self.enable_text()
-            self.log(f'Datos de {name}: {message}')# Muestra el mensaje en la ventana de log
-            self.disable_text()
-
-            try:  # Agregar un bloque try-except para depuración
-                response = f'Datos enviados: {message}'.encode()
-                client_socket.sendall(response)
-            except Exception as e:
-                print(f'Error sending data: {e}')  # Linea de depuración, se puede eliminar
-                break
-
+    def terminate_connection(self, client_socket, client_name):
         client_socket.close() # Cierra la conexion con el cliente
-        del self.connections[name]# Elimina la conexion del cliente
-        self.master.after(0, self.update_client_dropdown)  # Actualiza el menu de conectados
-        self.enable_text()
-        self.log(f'Conexion cerrada con {name}')# Muestra el mensaje en la ventana de log     
-        self.disable_text()
+        del self.connections[client_name]# Elimina la conexion del cliente
+        self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
+        self.log(f'Conexion cerrada con {client_name}')# Muestra el mensaje en la ventana de log     
+
+    def receive_message(self, client_socket):
+        try:  # Agregar un bloque try-except para depuración
+            data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
+        except Exception as e:
+            print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
+            return 'DISCONNECT'
+        return data.decode().strip()  # Los datos se vuelven bits
+
+    def send_message(self, client_socket, message):
+        try:  # Agregar un bloque try-except para depuración
+            response = f'Datos enviados: {message}'.encode()
+            client_socket.sendall(response)
+        except Exception as e:
+            print(f'Error sending data: {e}')  # Linea de depuración, se puede eliminar
     # =================================================================================================
 
     # ======================= BOTONES =======================
@@ -338,6 +340,7 @@ class ServerGUI:
                 button.destroy()# Elimina el botón
                 del self.client_buttons[name]# Elimina el botón del diccionario de botones
     # =================================================================================================
+
     # ======================= ENVIAR MENSAJE =======================
 
     # Mensaje global
