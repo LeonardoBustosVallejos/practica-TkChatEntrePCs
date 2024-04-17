@@ -17,6 +17,7 @@ class ClientGUI:
         master.protocol("WM_DELETE_WINDOW", self.on_close)
 
 # ======================================= IZQUIERDA DE LA GUI =======================================
+        # Etiqueta de nombre del servidor
         self.name = tk.StringVar()
         self.name.set("Pato")
 
@@ -35,7 +36,7 @@ class ClientGUI:
         self.connect_button.place(x=130, y=230)
 
         # Desconectar del server
-        self.disconnect_button = tk.Button(master, text='Desconectar', state=tk.DISABLED, command=self.disconnect_from_server)
+        self.disconnect_button = tk.Button(master, text='Desconectar', state=tk.NORMAL, command=self.disconnect_from_server)
         self.disconnect_button.place(x=230, y=230)
         
         # Texto de mensaje
@@ -46,7 +47,7 @@ class ClientGUI:
         self.message_text = tk.Text(master, height=3,width=50)
         self.message_text.place(x=20, y=290)
 
-        self.send_button = tk.Button(master, text='Enviar', command=self.send_message)
+        self.send_button = tk.Button(master, text='Enviar', state = tk.NORMAL, command=self.send_message)
         self.send_button.place(x=180, y=347)
 # =================================================================================================
 
@@ -133,6 +134,46 @@ class ClientGUI:
         for client in self.connections.keys():
             self.client_list.insert(tk.END, client)
 
+
+    def receive_messages(self):
+        while self.connected:
+            try:
+                # Receive data from the server
+                data = self.socket.recv(1024).decode('utf-8')
+
+                # If there's no data, the server closed the connection
+                if not data:
+                    self.log('Conexión perdida con el servidor')
+                    self.disconnect_from_server()
+                    break
+                
+                elif data.startswith('UPDADTE_CLIENTS'):
+                    self.enable_log()
+                    self.log_text.insert(tk.END, data + '\n')
+                    self.log_text.see(tk.END)
+                    self.disable_log()
+
+                # If the server sends 'SERVIDOR CAIDO...', disconnect
+                elif data == 'SERVIDOR CAIDO...':
+                    self.server_broken()
+                    break
+
+                # Add the received message to the text box
+                self.enable_log()
+                self.log_text.insert(tk.END, data + '\n')
+                self.log_text.see(tk.END)
+                self.disable_log()
+
+            except Exception as e:
+                print(e)
+                self.connected = False
+                self.socket.close()
+                break
+
+    def server_broken(self):
+        self.log('El servidor ha caído')
+        self.disconnect_from_server()
+
     def connect_to_server(self):
         max_retries = 3
         retries = 0
@@ -160,8 +201,8 @@ class ClientGUI:
                 self.global_button.config(state=tk.NORMAL)
                 self.remove_offline_button.config(state=tk.NORMAL)
                 self.messages_to_text.config(state=tk.NORMAL)
-                self.message_text.config(state=tk.DISABLED)
-                self.send_button.config(state=tk.DISABLED)
+                self.message_text.config(state=tk.NORMAL)
+                self.send_button.config(state=tk.NORMAL)
                 
                 break  # Si se conectó, salir del bucle
 
@@ -180,7 +221,8 @@ class ClientGUI:
 
     def disconnect_from_server(self):
         # Enviar mensaje de desconexión al servidor
-        self.socket.sendall('DISCONNECT'.encode())
+        if self.connected:
+            self.socket.sendall('DISCONNECT'.encode())
         self.connected = False
         self.socket.close()
         self.log('Desconectado del servidor')
@@ -192,29 +234,6 @@ class ClientGUI:
         self.message_text.config(state=tk.DISABLED)
         self.send_button.config(state=tk.DISABLED)
 
-    def receive_messages(self):
-        while self.connected:
-            try:
-                # Recibir datos del servidor
-                data = self.socket.recv(1024)
-
-                # Si no hay datos, el servidor cerró la conexión
-                if not data:
-                    self.log('Conexión perdida con el servidor')
-                    self.disconnect_from_server()
-                    break
-
-                # Agregar el mensaje recibido a la caja de texto
-                self.enable_log()
-                self.log_text.insert(tk.END, data.decode() + '\n')
-                self.log_text.see(tk.END)
-                self.disable_log()
-
-            except Exception as e:
-                print(e)
-                self.connected = False
-                self.socket.close()
-                break
 
     def send_message(self):
         # Obtener el mensaje ingresado en el cuadro de texto

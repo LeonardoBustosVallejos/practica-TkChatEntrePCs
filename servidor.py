@@ -16,8 +16,16 @@ class ServerGUI:
         self.client_var = tk.StringVar()   # Variable para el nombre del cliente
 
 # ======================================= IZQUIERDA DE LA GUI =======================================
+
+        # Etiqueta de nombre del servidor
+        self.name = tk.StringVar()
+        self.name.set('Servidor')
+
+        # Etiqueta de nombre del servidor
+        self.name_label = tk.Label(master, textvariable=self.name)
+        self.name_label.place_configure(x=130, y = 15)
         # Estado del servidor
-        self.status_label = tk.Label(master, text='Servidor detenido')
+        self.status_label = tk.Label(master, text='detenido')
         self.status_label.place_configure(x=180, y = 15) 
     
         # Texto para mostrar los mensajes
@@ -96,8 +104,16 @@ class ServerGUI:
         self.server_running = False
         # Botones de los clientes
         self.client_buttons = {}
+        # Socket del cliente
+        client_socket = None 
         # Guardar las conexiones
-        self.connections = {}
+        self.connections = {
+            'client_name': {
+                'socket': client_socket,
+                'connected': True
+            },
+            # ... more clients ...
+        }
         # clientes seleccionados para enviar mensajes
         self.selected_clients = []
 # =================================================================================================
@@ -141,7 +157,7 @@ class ServerGUI:
         self.message_text.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
 
-        self.status_label.config(text='Servidor corriendo')
+        self.status_label.config(text='Iniciado')
 
         self.select_client('Global')# Selecciona el cliente global    
         self.log_recipient('Global')# Muestra los destinatarios en la ventana de messages_to_text
@@ -154,7 +170,7 @@ class ServerGUI:
         # Vincular el socket a una dirección y puerto específicos
         self.server_socket.bind((HOST, PORT))
         self.enable_text
-        self.log(f'Servidor corriendo en el puerto {PORT}')
+        self.log(f'Servidor iniciado en el puerto {PORT}')
 
         # Escuchar en el socket para conexiones entrantes
         self.server_socket.listen(1)
@@ -185,6 +201,7 @@ class ServerGUI:
         if self.server_running:
             # Detiene el server
             self.server_running = False # El server ya no esta corriendo
+            self.send_system_message('SERVIDOR CAIDO...')
 
             for conn in self.connections.values():
                 try:
@@ -204,7 +221,7 @@ class ServerGUI:
             self.send_button.config(state=tk.DISABLED)
             self.global_button.config(state=tk.DISABLED)
 
-            self.status_label.config(text='Servidor detenido')
+            self.status_label.config(text='detenido')
 
         # Cierra la ventana si se presiono el boton de cerrar
         if close_gui:
@@ -264,14 +281,16 @@ class ServerGUI:
         self.terminate_connection(client_socket, client_name)
 
     def initialize_connection(self, client_name):
-        self.send_system_message(f'Cliente {client_name} se ha conectado')# Muestra el mensaje en la ventana de log
+        self.send_system_message(f'Cliente {client_name} se ha conectado', client_name) # Muestra el mensaje en la ventana de log
         self.log(f'Cliente {client_name} se ha conectado.')
         self.global_button.config(state='normal')  # Habilita el botón global
         if client_name in self.client_buttons:
             self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
-
+            
     def process_messages(self, client_socket, client_name):
         while self.server_running:
+            if not self.connections[client_name]['connected']:
+                break
             message = self.receive_message(client_socket)
             if message == 'DISCONNECT': # Si el mensaje es desconectar
                 self.client_buttons[client_name].config(bg='red')# Cambia el color del botón a rojo
@@ -282,9 +301,10 @@ class ServerGUI:
 
     def terminate_connection(self, client_socket, client_name):
         client_socket.close() # Cierra la conexion con el cliente
-        del self.connections[client_name]# Elimina la conexion del cliente
+        if client_name in self.connections:
+            del self.connections[client_name]# Elimina la conexion del cliente
         self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
-        self.log(f'Conexion cerrada con {client_name}')# Muestra el mensaje en la ventana de log     
+        self.log(f"Conexion cerrada con {client_name}")# Muestra el mensaje en la ventana de log 
 
     def receive_message(self, client_socket):
         try:  # Agregar un bloque try-except para depuración
@@ -336,21 +356,45 @@ class ServerGUI:
             if not self.connections.get(name):# If the client is not connected
                 self.client_buttons[name].destroy()# Remove the button
                 del self.client_buttons[name]# Remove the button from the dictionary
+
+
     # =================================================================================================
 
     # ======================= ENVIAR MENSAJE =======================
 
-    # Enviar un mensaje del sistema a todos los clientes
-    def send_system_message(self, message):
+    # Enviar un mensaje del sistema a todos los clientes cuando un cliente se conecta o se desconecta, excepto el mismo cliente
+    def send_system_message(self, message, client_name = None):
         disconnected_clients = []
+        new_client = client_name
         for client_name, client in self.connections.items():
             try:
-                client.sendall(message.encode())
-            except ConnectionResetError:
+                if new_client == client_name:
+                    pass
+                else:
+                    client.sendall(message.encode())
+            except (ConnectionResetError, OSError) as e:
+                print(f"Error sending system message: {e}")
                 disconnected_clients.append(client_name)
 
         for client_name in disconnected_clients:
             del self.connections[client_name]
+
+        # Create the connected_clients and disconnected_clients lists
+        # Assuming 'connections' is a dictionary where each value is another dictionary
+# that contains a 'socket' key (the socket object) and a 'connected' key (a boolean indicating if the client is connected)
+
+        connected_clients = [key for key, value in self.connections.items() if value['connected']]
+        disconnected_clients = [value for key, value in self.connections.items() if not value['connected']]
+
+        # Create the message with the connected_clients and disconnected_clients
+        message = {
+            'connected_clients': connected_clients,
+            'disconnected_clients': disconnected_clients
+        }
+
+        # Send the message to all clients
+        for client in self.connections.values():
+            client['connection'].send(message)
 
     # Mensaje global
     def send_global_message(self, message):
