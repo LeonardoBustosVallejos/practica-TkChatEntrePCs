@@ -147,22 +147,26 @@ class ClientGUI:
                     self.disconnect_from_server()
                     break
                 
-                elif data.startswith('UPDADTE_CLIENTS'):
-                    self.enable_log()
-                    self.log_text.insert(tk.END, data + '\n')
-                    self.log_text.see(tk.END)
-                    self.disable_log()
-
+                elif data.startswith('HIDDEN:'):
+                    hidden_message = data[7:]
+                    client_status_pairs = hidden_message.split(',')
+                    for pair in client_status_pairs:
+                        if ':' in pair:  # Ignore empty strings
+                            client, status = pair.split(':')
+                            client = client.strip()  # Remove leading/trailing whitespace
+                            status = status.strip()  # Remove leading/trailing whitespace
+                            self.update_buttons(client, status)
+                    print(client, status)
                 # If the server sends 'SERVIDOR CAIDO...', disconnect
                 elif data == 'SERVIDOR CAIDO...':
                     self.server_broken()
                     break
-
-                # Add the received message to the text box
-                self.enable_log()
-                self.log_text.insert(tk.END, data + '\n')
-                self.log_text.see(tk.END)
-                self.disable_log()
+                
+                else:
+                    self.enable_log()
+                    self.log_text.insert(tk.END, data + '\n')
+                    self.log_text.see(tk.END)
+                    self.disable_log()
 
             except Exception as e:
                 print(e)
@@ -173,6 +177,23 @@ class ClientGUI:
     def server_broken(self):
         self.log('El servidor ha caído')
         self.disconnect_from_server()
+
+    def update_buttons(self, client_name, status):
+        # Si el cliente no está en la lista de botones, agregarlo
+        if client_name not in self.client_buttons:
+            self.client_buttons[client_name] = tk.Button(self.buttons_frame, text=client_name, command=lambda: self.select_client(client_name))
+            self.client_buttons[client_name].grid(row=self.current_row, column=self.current_row_width % self.buttons_per_row)
+            self.current_row_width += 1
+            if self.current_row_width % self.buttons_per_row == 0:
+                self.current_row += 1
+
+        # Update the button state and color based on the client's status
+        if status == 'connected':
+            self.client_buttons[client_name]['state'] = 'normal'
+            self.client_buttons[client_name]['bg'] = 'green'
+        else:
+            self.client_buttons[client_name]['state'] = 'disabled'
+            self.client_buttons[client_name]['bg'] = 'red'
 
     def connect_to_server(self):
         max_retries = 3

@@ -1,0 +1,19 @@
+# =================================EN EL CLIENTE===============
+                    sender, message = data.split(':', 1)
+
+                    # If the sender is not in the list of buttons, add it
+                    self.update_buttons(sender)
+
+                    # If the sender is not in the list of connections, add it
+                    if sender not in self.connections:
+                        self.connections[sender] = self.socket
+
+                    # If the sender is not in the list of selected clients, add it
+                    if sender not in self.selected_clients:
+                        self.selected_clients.append(sender)
+
+                    # If the message is directed to the client, display it
+                    if 'Global' in self.selected_clients or self.name.get() in self.selected_clients:
+                        self.enable_log()
+                        self.log_text.insert(tk.END, f'{sender}: {message}\n')
+                        self.disable_log()
