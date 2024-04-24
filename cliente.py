@@ -158,20 +158,23 @@ class ClientGUI:
                 elif data.startswith('HIDDEN:'):
                     hidden_message = data[7:]
                     client_status_pairs = hidden_message.split(',')
+                    print(f'client_status_pairs: {client_status_pairs}') # Linea de debug, se puede eliminar
+                    connected_clients = set()  # Create a set to store the clients received from the server
                     for pair in client_status_pairs:
                         if ':' in pair:  # Ignore empty strings
                             client, status = pair.split(':')
                             client = client.strip()  # Remove leading/trailing whitespace
                             status = status.strip()  # Remove leading/trailing whitespace
                             self.update_buttons(client, status)
-                            time.sleep(0.01) # Sleep for a short time to allow the GUI to update
+                            connected_clients.add(client)  # Add the client to the set of received clients
 
-                    disconnected_clients = self.connected_clients - set(client_status_pairs)
+                    # Find the clients that have disconnected
+                    disconnected_clients = self.connected_clients - connected_clients
+                    print(f'disconnected_clients: {disconnected_clients}') # Linea de debug, se puede eliminar
                     for client in disconnected_clients:
-                        self.update_buttons_colors(client, 'disconnected')
-                        time.sleep(0.01)
+                        self.update_buttons_colors(client, 'disconnected')  # Update the button color to red
 
-                    self.connected_clients = set(client_status_pairs)
+                    self.connected_clients = connected_clients  # Update the set of connected clients
 
                 # If the server sends 'SERVIDOR CAIDO...', disconnect
                 elif data == 'SERVIDOR CAIDO...':
@@ -207,6 +210,8 @@ class ClientGUI:
                 self.connected_clients.add(client_name)  # Add the client to the set of connected clients
             except Exception as e:
                 print(f'Exception occurred: {e}') # Linea de debug, se puede eliminar
+        else:
+            self.update_buttons_colors(client_name, status) # Update the button color based on the client's status
 
 
     def create_button(self, client_name):
@@ -234,7 +239,7 @@ class ClientGUI:
             if status == 'connected':
                 self.client_buttons[client_name]['state'] = 'normal'
                 self.client_buttons[client_name]['bg'] = 'green'
-            else:
+            elif status == 'disconnected':
                 self.client_buttons[client_name]['state'] = 'disabled'
                 self.client_buttons[client_name]['bg'] = 'red'
 
