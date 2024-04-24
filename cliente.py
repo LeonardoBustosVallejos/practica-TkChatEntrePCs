@@ -98,8 +98,8 @@ class ClientGUI:
         self.connected = False
         # Botones de los clientes
         self.client_buttons = {}
-        # Guardar las conexiones
-        self.connections = {}
+        # Guardar clientes conectados
+        self.connected_clients = set()
         # clientes seleccionados para enviar mensajes
         self.selected_clients = []
         # Conectar al servidor
@@ -120,20 +120,28 @@ class ClientGUI:
         self.log_text.see(tk.END)
         self.disable_log()
 # =================================================================================================
+    def select_client(self, client_name):
+        if client_name == 'Global':
+            self.selected_clients.clear()
+            self.selected_client = 'Global'
+        else:
+            # If the client is in the list of selected clients, remove it
+            if client_name in self.selected_clients:
+                self.selected_clients.remove(client_name)
+            else:
+                # If the client is not in the list of selected clients, add it
+                self.selected_clients.append(client_name)
+
+            # If there are no selected clients, select 'Global'
+            if len(self.selected_clients) == 0:
+                self.selected_client = 'Global'
+            else:
+                # If there are selected clients, select the first one in the list
+                self.selected_client = self.selected_clients[0]
 
     def on_close(self):
-        if self.connected:# Si esta conectado enviar mensaje de desconexion
-            self.socket.sendall('DISCONNECT'.encode())
+        self.disconnect_from_server()
         self.master.destroy()# Cerrar la ventana
-        
-    def update_client_dropdown(self):
-        # Clear the current dropdown menu
-        self.client_list.delete(0, tk.END)
-
-        # Add each client to the dropdown menu
-        for client in self.connections.keys():
-            self.client_list.insert(tk.END, client)
-
 
     def receive_messages(self):
         while self.connected:
@@ -156,7 +164,15 @@ class ClientGUI:
                             client = client.strip()  # Remove leading/trailing whitespace
                             status = status.strip()  # Remove leading/trailing whitespace
                             self.update_buttons(client, status)
-                    print(client, status)
+                            time.sleep(0.01) # Sleep for a short time to allow the GUI to update
+
+                    disconnected_clients = self.connected_clients - set(client_status_pairs)
+                    for client in disconnected_clients:
+                        self.update_buttons_colors(client, 'disconnected')
+                        time.sleep(0.01)
+
+                    self.connected_clients = set(client_status_pairs)
+
                 # If the server sends 'SERVIDOR CAIDO...', disconnect
                 elif data == 'SERVIDOR CAIDO...':
                     self.server_broken()
@@ -179,23 +195,52 @@ class ClientGUI:
         self.disconnect_from_server()
 
     def update_buttons(self, client_name, status):
-        # Si el cliente no está en la lista de botones, agregarlo
-        if client_name not in self.client_buttons:
-            self.client_buttons[client_name] = tk.Button(self.buttons_frame, text=client_name, command=lambda: self.select_client(client_name))
-            self.client_buttons[client_name].grid(row=self.current_row, column=self.current_row_width % self.buttons_per_row)
-            self.current_row_width += 1
-            if self.current_row_width % self.buttons_per_row == 0:
-                self.current_row += 1
+        # If the client is not in the list of buttons, add it
+        if (client_name not in self.client_buttons) and (client_name != self.name.get()):
+            try:
+                # Create a button for the client
+                button = self.create_button(client_name)
+                button_width = button.winfo_reqwidth()  # Get the width of the button
+                self.calculate_position(button_width)  # Calculate the position of the button
+                self.add_button_to_grid_and_dict(button, client_name)  # Add the button to the grid and dictionary
+                self.update_buttons_colors(client_name, status)  # Update the button color based on the client's status
+                self.connected_clients.add(client_name)  # Add the client to the set of connected clients
+            except Exception as e:
+                print(f'Exception occurred: {e}') # Linea de debug, se puede eliminar
 
-        # Update the button state and color based on the client's status
-        if status == 'connected':
-            self.client_buttons[client_name]['state'] = 'normal'
-            self.client_buttons[client_name]['bg'] = 'green'
+
+    def create_button(self, client_name):
+        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
+        button.bind('<Button-1>', lambda e: self.select_client(client_name))
+        button.update_idletasks()
+        return button
+
+    def calculate_position(self, button_width):
+        if not self.client_buttons or button_width + self.current_row_width > self.canvas_width:
+            self.current_row += 1
+            self.current_row_width = 0
+            self.current_column = 0
         else:
-            self.client_buttons[client_name]['state'] = 'disabled'
-            self.client_buttons[client_name]['bg'] = 'red'
+            self.current_column += 1
+        self.current_row_width += button_width
+
+    def add_button_to_grid_and_dict(self, button, client_name):
+        button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
+        self.client_buttons[client_name] = button
+
+    def update_buttons_colors(self, client_name, status):
+        # Update the button state and color based on the client's status
+        if client_name in self.client_buttons:
+            if status == 'connected':
+                self.client_buttons[client_name]['state'] = 'normal'
+                self.client_buttons[client_name]['bg'] = 'green'
+            else:
+                self.client_buttons[client_name]['state'] = 'disabled'
+                self.client_buttons[client_name]['bg'] = 'red'
+
 
     def connect_to_server(self):
+        
         max_retries = 3
         retries = 0
         while True:

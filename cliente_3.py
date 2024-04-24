@@ -19,7 +19,7 @@ class ClientGUI:
 # ======================================= IZQUIERDA DE LA GUI =======================================
         # Etiqueta de nombre del servidor
         self.name = tk.StringVar()
-        self.name.set("Ganso")
+        self.name.set("Patata")
 
         # Label para el nombre del usuario
         self.name_label = tk.Label(master, text='USUARIO: ')
