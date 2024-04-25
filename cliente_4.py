@@ -19,7 +19,7 @@ class ClientGUI:
 # ======================================= IZQUIERDA DE LA GUI =======================================
         # Etiqueta de nombre del servidor
         self.name = tk.StringVar()
-        self.name.set("Pato")
+        self.name.set("CARBON")
 
         # Label para el nombre del usuario
         self.name_label = tk.Label(master, text='USUARIO: ')
@@ -82,7 +82,7 @@ class ClientGUI:
         self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
 
         # Boton "Eliminar desconectados"
-        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
+        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados')
         self.remove_offline_button.place(x=510, y=280)
 
         # Destinatarios
@@ -91,8 +91,6 @@ class ClientGUI:
         # Text para mostrar los destinatarios
         self.messages_to_text = tk.Text(master, bg='#f0f0f0', height = 4, width=18, state=tk.DISABLED)
         self.messages_to_text.place(x=620, y=280)
-
-        self.log_recipient('Global')
 # =================================================================================================
 
 # ======================================= VARIABLES DE LA GUI =======================================
@@ -122,41 +120,24 @@ class ClientGUI:
         self.log_text.see(tk.END)
         self.disable_log()
 # =================================================================================================
-    def remove_offline_button(self):
-        # Eliminar los botones de los clientes desconectados
-        for client_name in list(self.client_buttons.keys()):
-            if client_name not in self.connected_clients:
-                self.client_buttons[client_name].destroy()
-                del self.client_buttons[client_name]
-
     def select_client(self, client_name):
-        # If 'Global' is selected, clear the list of selected clients
         if client_name == 'Global':
-            self.selected_clients = ['Global']
+            self.selected_clients.clear()
+            self.selected_client = 'Global'
         else:
-            # If 'Global' is in the list, remove it
-            if 'Global' in self.selected_clients:
-                self.selected_clients.remove('Global')
-            # If the client is already in the list, remove it, otherwise, add it
+            # If the client is in the list of selected clients, remove it
             if client_name in self.selected_clients:
                 self.selected_clients.remove(client_name)
             else:
+                # If the client is not in the list of selected clients, add it
                 self.selected_clients.append(client_name)
-        # If no client is selected, select 'Global' by default
-        if not self.selected_clients:
-            self.selected_clients = ['Global']
-        # Update the recipients text box
-        self.update_recipients_text()
 
-    def update_recipients_text(self):
-        # Enable the recipients text box
-        self.messages_to_text.config(state='normal')
-        # Clear the recipients text box
-        self.messages_to_text.delete('1.0', tk.END)
-        # Add the selected clients to the recipients text box
-        self.messages_to_text.insert(tk.END, ', '.join(self.selected_clients))
-        # Disable the recipients text box
-        self.messages_to_text.config(state='disabled')
+            # If there are no selected clients, select 'Global'
+            if len(self.selected_clients) == 0:
+                self.selected_client = 'Global'
+            else:
+                # If there are selected clients, select the first one in the list
+                self.selected_client = self.selected_clients[0]
 
     def on_close(self):
         self.disconnect_from_server()
@@ -211,14 +192,6 @@ class ClientGUI:
                 self.connected = False
                 self.socket.close()
                 break
-    
-    def log_recipient(self, recipient):
-        if not recipient:
-            recipient = 'Global'
-        self.messages_to_text.config(state='normal')
-        self.messages_to_text.delete('1.0', 'end')
-        self.messages_to_text.insert('end', recipient)
-        self.messages_to_text.config(state='disabled')
 
     def server_broken(self):
         self.log('El servidor ha caído')
