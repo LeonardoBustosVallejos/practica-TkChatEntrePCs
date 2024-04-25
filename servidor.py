@@ -8,6 +8,7 @@ MAX_CONNECTIONS = 1000000  # Número máximo de conexiones simultáneas
 
 class ServerGUI:
     def __init__(self, master):
+
         self.master = master
         master.title('Servidor')
         master.resizable(0,0)

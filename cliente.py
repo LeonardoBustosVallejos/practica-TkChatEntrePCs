@@ -82,7 +82,7 @@ class ClientGUI:
         self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
 
         # Boton "Eliminar desconectados"
-        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados')
+        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
         self.remove_offline_button.place(x=510, y=280)
 
         # Destinatarios
@@ -91,6 +91,8 @@ class ClientGUI:
         # Text para mostrar los destinatarios
         self.messages_to_text = tk.Text(master, bg='#f0f0f0', height = 4, width=18, state=tk.DISABLED)
         self.messages_to_text.place(x=620, y=280)
+
+        self.log_recipient('Global')
 # =================================================================================================
 
 # ======================================= VARIABLES DE LA GUI =======================================
@@ -120,6 +122,13 @@ class ClientGUI:
         self.log_text.see(tk.END)
         self.disable_log()
 # =================================================================================================
+    def remove_offline_button(self):
+        # Eliminar los botones de los clientes desconectados
+        for client_name in list(self.client_buttons.keys()):
+            if client_name not in self.connected_clients:
+                self.client_buttons[client_name].destroy()
+                del self.client_buttons[client_name]
+
     def select_client(self, client_name):
         if client_name == 'Global':
             self.selected_clients.clear()
@@ -192,6 +201,14 @@ class ClientGUI:
                 self.connected = False
                 self.socket.close()
                 break
+    
+    def log_recipient(self, recipient):
+        if not recipient:
+            recipient = 'Global'
+        self.messages_to_text.config(state='normal')
+        self.messages_to_text.delete('1.0', 'end')
+        self.messages_to_text.insert('end', recipient)
+        self.messages_to_text.config(state='disabled')
 
     def server_broken(self):
         self.log('El servidor ha caído')
