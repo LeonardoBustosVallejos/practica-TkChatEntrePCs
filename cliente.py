@@ -76,10 +76,17 @@ class ClientGUI:
         self.scrollbar.place(x=770, y=50, height=200)
         self.current_row = 0
         self.current_row_width = 0
+        self.current_column = 0  # Add this line
         self.canvas_width = 260 - 10
 
         # Configurar el evento de desplazamiento del canvas para que se ajuste al tamaño del frame
         self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
+        
+        # Create a button for the server
+        self.server_button = tk.Button(self.buttons_frame, text='Server', bg='green', width=10, height= 1, command=lambda: self.select_client('Server'))
+        self.server_button.grid(row=0, column=0, padx=3, pady=3)
+        # Add the server button to the dictionary of client buttons
+        self.client_buttons = {'Server': self.server_button}
 
         # Boton "Eliminar desconectados"
         self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
@@ -98,8 +105,6 @@ class ClientGUI:
 # ======================================= VARIABLES DE LA GUI =======================================
         # Variable para saber si esta conectado
         self.connected = False
-        # Botones de los clientes
-        self.client_buttons = {}
         # Guardar clientes conectados
         self.connected_clients = set()
         # clientes seleccionados para enviar mensajes
@@ -125,12 +130,14 @@ class ClientGUI:
     def remove_offline_button(self):
         # Eliminar los botones de los clientes desconectados
         for client_name in list(self.client_buttons.keys()):
-            if client_name not in self.connected_clients:
+            if client_name != 'Server' and client_name not in self.connected_clients:
                 self.client_buttons[client_name].destroy()
                 del self.client_buttons[client_name]
 
     def select_client(self, client_name):
+        print(f"Client {client_name} selected.")
         # If 'Global' is selected, clear the list of selected clients
+        # If 'Server' is selected, do nothing
         if client_name == 'Global':
             self.selected_clients = ['Global']
         else:
@@ -157,6 +164,8 @@ class ClientGUI:
         self.messages_to_text.insert(tk.END, ', '.join(self.selected_clients))
         # Disable the recipients text box
         self.messages_to_text.config(state='disabled')
+        print(f'selected_clients: {self.selected_clients}') # Linea de debug, se puede eliminar
+
 
     def on_close(self):
         self.disconnect_from_server()
@@ -298,6 +307,8 @@ class ClientGUI:
                 self.disconnect_button.config(state=tk.NORMAL)
                 self.global_button.config(state=tk.NORMAL)
                 self.remove_offline_button.config(state=tk.NORMAL)
+                # Change the background color of the server button to green
+                self.client_buttons['Server'].config(bg='green')
                 self.messages_to_text.config(state=tk.NORMAL)
                 self.message_text.config(state=tk.NORMAL)
                 self.send_button.config(state=tk.NORMAL)
@@ -328,10 +339,15 @@ class ClientGUI:
         self.disconnect_button.config(state=tk.DISABLED)
         self.global_button.config(state=tk.DISABLED)
         self.remove_offline_button.config(state=tk.DISABLED)
+        # Schedule the GUI update to run in the main thread
+        self.master.after(0, self.update_server_button_color)
         self.messages_to_text.config(state=tk.DISABLED)
         self.message_text.config(state=tk.DISABLED)
         self.send_button.config(state=tk.DISABLED)
 
+    def update_server_button_color(self):
+        # Change the background color of the server button to red
+        self.client_buttons['Server'].config(bg='red')
 
     def send_message(self):
         # Obtener el mensaje ingresado en el cuadro de texto
@@ -347,6 +363,7 @@ class ClientGUI:
         # Verificar si el socket aún está abierto
         if not self.socket._closed:
             # Enviar el mensaje al servidor
+            message = f'SENDER-{self.name.get()}//CLIENTS_TO-{self.selected_clients}//MESSAGE.{message}'
             self.socket.sendall(message.encode())
 
             # Borrar el cuadro de texto de mensaje
