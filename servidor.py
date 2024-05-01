@@ -208,7 +208,7 @@ class ServerGUI:
             try:
                 self.server_socket.close()# Cierra conexion con el socket
             except Exception as e:
-                print(f'Error closing server socket: {e}')
+                print(f'Error closing socket: {e}')
 
             # Habilita y deshabilita los botones
             self.start_button.config(state=tk.NORMAL)
@@ -230,6 +230,7 @@ class ServerGUI:
         if client_name == 'Global':
             self.selected_clients.clear()
             self.selected_client = 'Global'
+            self.clients_to = ''
         else:
             # If the client is in the list of selected clients, remove it
             if client_name in self.selected_clients:
@@ -273,6 +274,19 @@ class ServerGUI:
     def remove_selected_client(self, client):
         self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
 
+
+    def handle_parsed_message(self, sender, clients_to, message_text):
+        print(f'handle_parsed_message called with sender={sender}, clients_to={clients_to}, message_text={message_text}')  # Debug line
+        if 'Global' in clients_to:
+            print('Sending global message')  # Debug line
+            self.send_global_message(sender, message_text)
+        else:
+            print('Sending private messages')  # Debug line
+            self.selected_clients = clients_to  # Update selected_clients to match clients_to
+            for client in clients_to:
+                print(f'Sending message to {client}')  # Debug line
+                self.send_private_message(sender, message_text)
+
     # Manejar la conexión con un cliente
     def handle_connection(self, client_socket, client_address, client_name):
         # Add the new client to self.connections
@@ -306,18 +320,23 @@ class ServerGUI:
         self.global_button.config(state='normal')  # Habilita el botón global
         if client_name in self.client_buttons:
             self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
-            
+
+    def parse_message(self, message):
+        parts = message.split('//')
+        sender = parts[0].split('-')[1]
+        clients_to = [client.strip("'") for client in parts[1].split('-')[1].strip('[]').split(', ')]
+        message_text = parts[2].split('.')[1]
+        return sender, clients_to, message_text
+
     def process_messages(self, client_socket, client_name):
-        while self.server_running:
-            if not self.connections[client_name]['connected']:
-                break
+        while True:
             message = self.receive_message(client_socket)
-            if message == 'DISCONNECT': # Si el mensaje es desconectar
-                self.client_buttons[client_name].config(bg='red')# Cambia el color del botón a rojo
+            if message == 'DISCONNECT':
+                self.client_buttons[client_name].config(bg='red')
                 break
             if message != '':
-                self.log(f'Datos de {client_name}: {message}')# Muestra el mensaje en la ventana de log
-                self.send_message(message)# Envia el mensaje a todos los clientes
+                sender, clients_to, message_text = self.parse_message(message)
+                self.handle_parsed_message(sender, clients_to, message_text)
 
     def terminate_connection(self, client_socket, client_name):
         client_socket.close() # Cierra la conexion con el cliente
@@ -398,31 +417,33 @@ class ServerGUI:
                     del self.connections[client_name]
 
     # Mensaje global
-    def send_global_message(self, message):
+    def send_global_message(self, sender, message):
         for client_name, client_info in self.connections.items(): # Envia el mensaje a todos los clientes
-            message_aux = f'Global: {message}'
+            message_aux = f'{sender} (Global): {message}'
             client_info['connection'].sendall(message_aux.encode()) # Envia el mensaje
         self.log(message_aux)# Muestra el mensaje en la ventana de log
 
     # Mensaje privado
-    def send_private_message(self, message):
+    def send_private_message(self, sender, message):
+        print(f'send_private_message called with selected_clients={self.selected_clients}')  # Debug line
         for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
             if self.connections.get(selected_client):
-                self.log(f'Mensaje a {selected_client}: {message}')
-                message_aux = f'Mensaje privado: {message}' # Muestra el mensaje en la ventana de log
-                self.send_message_to_client(selected_client, message_aux) # Envia el mensaje al cliente seleccionado
+                self.log(f'Mensaje de {sender} a {selected_client}: {message}')
+                message_aux = f'Mensaje privado de {sender}: {message}' # Muestra el mensaje en la ventana de log
+                client_connection = self.connections[selected_client]['connection']  # Get the connection object for selected_client
+                self.send_message_to_client(client_connection, selected_client, message_aux)  # Provide the connection object as the first argument
             else:
                 self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
 
     # Enviar un mensaje a un(unos) cliente(s) específico(s)
-    def send_message_to_client(self, client, message):
+    def send_message_to_client(self, sender, client, message):
         try:
             self.connections[client]['connection'].sendall(message.encode())# Envia el mensaje al cliente
         except Exception as e:
-            self.log(f'Error sending message to {client}: {e}')
+            self.log(f'Error sending message from {sender} to {client}: {e}')
             self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
-        
-    def send_message(self, message=None):
+
+    def send_message(self, sender, clients_to, message=None):
         # If no message argument is provided, get the message from self.message_text
         if message is None:
             message = self.message_text.get('1.0', 'end').strip()
@@ -433,11 +454,11 @@ class ServerGUI:
             return
 
         # If the selected client is 'Global', send the message to all clients
-        if self.selected_client == 'Global':
-            self.send_global_message(message)
+        if 'Global' in clients_to:
+            self.send_global_message(sender, message)
         # If the selected client is not 'Global', send the message to the selected client
         else:
-            self.send_private_message(message)
+            self.send_private_message(sender, message)
     #   =================================================================================================
 
 root = tk.Tk()
