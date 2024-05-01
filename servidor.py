@@ -264,20 +264,28 @@ class ServerGUI:
 
     # desconectar un cliente
     def handle_disconnected_client(self, client):
-        # Set the 'connected' status of the client to False
-        self.connections[client]['connected'] = False
-        # Print the status of all clients
-        self.print_client_status()  # Linea de depuración, se puede eliminar
-        self.log(f'{client} no está conectado')
-        self.remove_selected_client(client) 
-        self.log_recipient(self.selected_clients)# Muestra los destinatarios en la ventana de messages_to_text
+        if client != 'Server':
+            # Set the 'connected' status of the client to False
+            self.connections[client]['connected'] = False
+            # Print the status of all clients
+            self.print_client_status()  # Debug line, can be removed
+            self.log(f'{client} is not connected')
+            self.remove_selected_client(client) 
+            self.log_recipient(self.selected_clients)  # Show the recipients in the messages_to_text window
 
     def remove_selected_client(self, client):
         self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
 
+    def handle_server_message(self, sender, message):
+        print(f'{sender} (Servidor): {message}')
+        self.log(f'{sender} (Servidor): {message}')
+
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
-        print(f'handle_parsed_message called with sender={sender}, clients_to={clients_to}, message_text={message_text}')  # Debug line
+            # If 'Server' is in clients_to, handle the message separately
+        if 'Server' in clients_to:
+            self.handle_server_message(sender, message_text)
+            clients_to.remove('Server')  # Remove 'Server' from clients_to
 
         if 'Global' in clients_to or '' in clients_to:
             print('Sending global message')  # Debug line
@@ -430,12 +438,21 @@ class ServerGUI:
         print(f'send_private_message called with selected_clients={self.selected_clients}')  # Debug line
         for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
             if self.connections.get(selected_client):
-                message_aux = f'Mensaje (Privado) de {sender}: {message}' # Muestra el mensaje en la ventana de log
+                message_aux = f'{sender} (Privado): {message}' # Muestra el mensaje en la ventana de log
                 self.send_message_to_client(sender, selected_client, message_aux) # Envia el mensaje al cliente seleccionado
             else:
                 self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
-        # Log the message after all private messages have been sent
-        recipients = " y ".join(self.selected_clients)
+
+        self.send_response_to_sender(sender, self.selected_clients ,message)# Envia una respuesta al remitente
+
+    def send_response_to_sender(self, sender, selected_clients, message):
+        # Convert the list of selected clients to a comma-separated string
+        selected_clients_str = ', '.join(selected_clients)
+
+        # Send a response back to the sender
+        response = f'Privado a {selected_clients_str}: {message}'
+        print(f'Sending response to {sender}: {response}')
+        self.connections[sender]['connection'].sendall(response.encode())
 
     # Enviar un mensaje a un(unos) cliente(s) específico(s)
     def send_message_to_client(self, sender, client, message):
@@ -460,7 +477,7 @@ class ServerGUI:
             self.send_global_message(sender, message)
         # If the selected client is not 'Global', send the message to the selected client
         else:
-            self.send_private_message(sender, message)
+            self.send_private_message(sender, message)   
     #   =================================================================================================
 
 root = tk.Tk()

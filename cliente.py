@@ -349,30 +349,50 @@ class ClientGUI:
         # Change the background color of the server button to red
         self.client_buttons['Server'].config(bg='red')
 
-    def send_message(self):
-        # Obtener el mensaje ingresado en el cuadro de texto
-        message = self.message_text.get('1.0', tk.END).strip()
-        
+    def send_message(self, message):
         self.enable_log()
 
-        # Verificar si estamos conectados al servidor
+        # Verify if we are connected to the server
         if not self.connected:
             messagebox.showerror('Error', 'No se pudo enviar el mensaje: no hay conexión con el servidor.')
             return
 
-        # Verificar si el socket aún está abierto
+        # Verify if the socket is still open
         if not self.socket._closed:
-            # Enviar el mensaje al servidor
+            # Send the message to the server
             message = f'SENDER-{self.name.get()}//CLIENTS_TO-{self.selected_clients}//MESSAGE.{message}'
             self.socket.sendall(message.encode())
 
-            # Borrar el cuadro de texto de mensaje
+            # Clear the message text box
             self.message_text.delete('1.0', tk.END)
         else:
-            # Mostrar un mensaje de error si el socket está cerrado
+            # Show an error message if the socket is closed
             messagebox.showerror('Error', 'No se pudo enviar el mensaje: la conexión con el servidor se ha perdido.')
         
         self.disable_log()
+
+        # After the message is sent, listen for a response from the server
+        response = self.listen_for_response()
+
+
+        # Update the GUI with the response
+        self.update_sent_messages(response)
+
+    def listen_for_response(self):
+        try:
+            # Receive data from the server
+            data = self.socket.recv(1024)
+        except Exception as e:
+            print(f'Error receiving data from the server: {e}')
+            return None
+
+        # Decode the data and return it
+        return data.decode()
+
+    def update_sent_messages(self, response):
+        # Add the response to the GUI
+        self.log('end', response + '\n')
+
 
 if __name__ == "__main__":
     root = tk.Tk()
