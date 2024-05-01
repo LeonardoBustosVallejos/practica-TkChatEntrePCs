@@ -112,6 +112,7 @@ class ServerGUI:
         }
         # clientes seleccionados para enviar mensajes
         self.selected_clients = []
+        self.recipients = ''
 # =================================================================================================
 
 # ===================================== FUNCIONES UTILITARIAS =====================================
@@ -274,7 +275,7 @@ class ServerGUI:
     def remove_selected_client(self, client):
         self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
 
-
+    # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
         print(f'handle_parsed_message called with sender={sender}, clients_to={clients_to}, message_text={message_text}')  # Debug line
         if 'Global' in clients_to:
@@ -283,9 +284,10 @@ class ServerGUI:
         else:
             print('Sending private messages')  # Debug line
             self.selected_clients = clients_to  # Update selected_clients to match clients_to
-            for client in clients_to:
-                print(f'Sending message to {client}')  # Debug line
-                self.send_private_message(sender, message_text)
+            self.send_private_message(sender, message_text)
+            recipients = " y ".join(self.selected_clients)
+            self.log(f'{sender} (Privado) a {recipients}: {message_text}')
+
 
     # Manejar la conexión con un cliente
     def handle_connection(self, client_socket, client_address, client_name):
@@ -423,17 +425,16 @@ class ServerGUI:
             client_info['connection'].sendall(message_aux.encode()) # Envia el mensaje
         self.log(message_aux)# Muestra el mensaje en la ventana de log
 
-    # Mensaje privado
     def send_private_message(self, sender, message):
         print(f'send_private_message called with selected_clients={self.selected_clients}')  # Debug line
         for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
             if self.connections.get(selected_client):
-                self.log(f'Mensaje de {sender} a {selected_client}: {message}')
-                message_aux = f'Mensaje privado de {sender}: {message}' # Muestra el mensaje en la ventana de log
-                client_connection = self.connections[selected_client]['connection']  # Get the connection object for selected_client
-                self.send_message_to_client(client_connection, selected_client, message_aux)  # Provide the connection object as the first argument
+                message_aux = f'Mensaje (Privado) de {sender}: {message}' # Muestra el mensaje en la ventana de log
+                self.send_message_to_client(sender, selected_client, message_aux) # Envia el mensaje al cliente seleccionado
             else:
                 self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
+        # Log the message after all private messages have been sent
+        recipients = " y ".join(self.selected_clients)
 
     # Enviar un mensaje a un(unos) cliente(s) específico(s)
     def send_message_to_client(self, sender, client, message):

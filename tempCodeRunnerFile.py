@@ -1,19 +1,11 @@
-ientes seleccionados
-        
-    def send_message(self):
-        # Get the message entered in the text box
-        message = self.message_text.get('1.0', tk.END).strip()
-
-        # Check if we are connected to the server
-        if not self.connected:
-            messagebox.showerror('Error', 'No se pudo enviar el mensaje: no hay conexión con el servidor.')
-            return
-
-        # Split the message into sender, recipients, and the actual message
-        parts = message.split('//')
-        if len(parts) != 3:
-            messagebox.showerror('Error', 'El formato del mensaje es incorrecto.')
-            return
-
-        sender = parts[0].split('-')[1]
-        recipient
+    def send_private_message(self, sender, message):
+        print(f'send_private_message called with selected_clients={self.selected_clients}')  # Debug line
+        for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
+            if self.connections.get(selected_client):
+                message_aux = f'Mensaje (Privado) de {sender}: {message}' # Muestra el mensaje en la ventana de log
+                self.send_message_to_client(sender, selected_client, message_aux) # Envia el mensaje al cliente seleccionado
+            else:
+                self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
+        # Log the message after all private messages have been sent
+        recipients = " y ".join(self.selected_clients)
+        self.log(f'Mensaje (Privado) de {sender} a {recipients}: {message}')
