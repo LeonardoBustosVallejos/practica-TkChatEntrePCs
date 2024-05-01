@@ -278,7 +278,8 @@ class ServerGUI:
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
         print(f'handle_parsed_message called with sender={sender}, clients_to={clients_to}, message_text={message_text}')  # Debug line
-        if 'Global' in clients_to:
+
+        if 'Global' in clients_to or '' in clients_to:
             print('Sending global message')  # Debug line
             self.send_global_message(sender, message_text)
         else:
