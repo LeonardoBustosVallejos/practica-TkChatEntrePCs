@@ -186,7 +186,7 @@ class ClientGUI:
                 break  # Si se conectó, salir del bucle
 
             except Exception as e:
-                print(e)
+                print(e) # Linea de excepción
 
                 # Configurar la variable de conexión
                 self.connected = False
@@ -210,20 +210,21 @@ class ClientGUI:
 
     # Función para manejar la caída del servidor
     def server_broken(self):
-        print('Server is bvroken')
         self.log('El servidor ha caído')
         self.disconnect_from_server()
 
     # Función para desconectarse del servidor
     def disconnect_from_server(self):
-        print('Desconectando del servidor...')
         try:
             # Enviar mensaje de desconexión al servidor
             if self.connected:
-                self.socket.sendall('DISCONNECT'.encode())
-            self.socket.close()
+                try:
+                    self.socket.sendall('DISCONNECT'.encode())
+                except OSError:
+                    print('Server already disconnected') # Linea de error
+                self.socket.close()
         except (ConnectionResetError, ConnectionRefusedError):
-            print('Error al desconectar del servidor')
+            print('Error al desconectar del servidor') # Linea de error
         finally:
             self.connected = False
             self.log('Desconectado del servidor')
@@ -241,7 +242,6 @@ class ClientGUI:
 # ==================================== FUNCIONES DE CLIENTES ========================================
     # Función para seleccionar un cliente
     def select_client(self, client_name):
-        print(f"Client {client_name} selected.") # Linea de debug, se puede eliminar
 
         if client_name == 'Global': # Si se selecciona Global, se seleccionan todos los clientes
             self.selected_clients = ['Global'] # Los clientes seleccionados sera 'Global'
@@ -306,7 +306,7 @@ class ClientGUI:
                 self.update_buttons_colors(client_name, status)  # Actualiza el color del botón basado en el estado del cliente
                 self.connected_clients.add(client_name)  # Añade el cliente a la lista de clientes conectados
             except Exception as e:
-                print(f'Exception occurred: {e}') # Linea de debug, se puede eliminar
+                print(f'Exception occurred: {e}') # Linea de excepción
         else:
             self.update_buttons_colors(client_name, status) # Actualiza el color del botón basado en el estado del cliente
 
@@ -374,7 +374,7 @@ class ClientGUI:
             # Revice datos del servidor
             data = self.socket.recv(1024)
         except Exception as e: # Si hay un error al recibir datos
-            print(f'Error receiving data from the server: {e}')
+            print(f'Error receiving data from the server: {e}') # Linea de excepción
             return None
 
         # Decodifica los datos recibidos y los regresa
@@ -387,20 +387,18 @@ class ClientGUI:
                 data = self.socket.recv(1024).decode('utf-8') # Recibe datos del servidor
                 self.handle_received_data(data) # Maneja los datos recibidos
             except Exception as e:
-                print(e)
+                print(e) # Linea de excepción
                 self.connected = False
                 self.socket.close()
                 break
 
     # Función para manejar los datos recibidos
     def handle_received_data(self, data):
-        print(f'Received data: {data}')  # Linea de debug, se puede eliminar
         if not data: # Si no hay datos
             self.handle_server_disconnection() # Maneja la desconexión del servidor
         elif data.startswith('HIDDEN:'): # Si los datos empiezan con 'HIDDEN:'
             self.handle_hidden_message(data[7:]) # Maneja los mensajes ocultos
         elif data == 'Sistema: SERVIDOR CAIDO...': # Si los datos son 'Sistema: SERVIDOR CAIDO...'
-            print('Server is down') # Linea de debug, se puede eliminar
             self.server_broken() # Maneja la caída del servidor
         elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
             self.update_sent_messages(data) # Actualiza los mensajes enviados

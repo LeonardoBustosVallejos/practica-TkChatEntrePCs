@@ -1,6 +1,7 @@
 import socket
 import threading
 import tkinter as tk
+import time
 
 HOST = ''  # Significa que escucha en todas las interfaces de red
 PORT = 8888  # Puerto para escuchar
@@ -202,17 +203,19 @@ class ServerGUI:
             self.server_running = False # El server ya no esta corriendo
             self.send_system_message('SERVIDOR CAIDO...')
 
+            time.sleep(0.3)  # Espera un segundo para que los mensajes se envíen antes de cerrar las conexiones
+
             for conn_dict in self.connections.values():
                 try:
                     conn = conn_dict['connection']
                     conn.close()# Cierra la conexion con el cliente
                 except Exception as e:
-                    print(f'Error closing connection: {e}')
+                    print(f'Error closing connection: {e}') # Linea de error
 
             try:
                 self.server_socket.close()# Cierra conexion con el socket
             except Exception as e:
-                print(f'Error closing socket: {e}')
+                print(f'Error closing socket: {e}') # Linea de error
 
             # Habilita y deshabilita los botones
             self.start_button.config(state=tk.NORMAL)
@@ -299,6 +302,24 @@ class ServerGUI:
             self.log(f'{client} is not connected')
             self.remove_selected_client(client) 
             self.log_recipient(self.selected_clients)  # Muestra los destinatarios en la ventana de messages_to_text
+
+    # Procesar los mensajes del cliente
+    # Se relaciona tanto con mensajes como con la desconexión del cliente
+    def process_messages(self, client_socket, client_name):
+        while self.server_running:  # Solo procesa mensajes si el servidor esta corriendo
+            try:
+                message = self.receive_message(client_socket)# Recibe el mensaje del cliente
+                if message == 'DISCONNECT': # Si el mensaje es 'DISCONNECT'
+                    self.client_buttons[client_name].config(bg='red' )# Cambia el color del botón a rojo
+                    break
+                if message != '':# Si el mensaje no esta vacio
+                    sender, clients_to, message_text = self.parse_message(message)# Parsea el mensaje
+                    self.handle_parsed_message(sender, clients_to, message_text)# Maneja el mensaje parseado
+            # Maneja las excepciones
+            except ConnectionAbortedError: # Si la conexión fue abortada
+                print(f'Connection with {client_name} was aborted.') # Linea de error
+            except Exception as e: # Si hay un error
+                print(f'Error processing messages from {client_name}: {e}') # Linea de error
     # =================================================================================================
 
     # ======================= BOTONES =======================
@@ -346,59 +367,49 @@ class ServerGUI:
 
     # Eliminar clientes desconectados
     def remove_offline(self):
-        # Create a copy of the keys
+        # Crea una copia de la lista de botones
         client_names = list(self.client_buttons.keys())
-        # Iterate over the copy
+        # Itera sobre la lista de botones
         for name in client_names:
-            if not self.connections.get(name):# If the client is not connected
-                self.client_buttons[name].destroy()# Remove the button
-                del self.client_buttons[name]# Remove the button from the dictionary
+            if not self.connections.get(name):# Si el cliente no esta conectado
+                self.client_buttons[name].destroy()# Remueve el botón
+                del self.client_buttons[name]# Remueve el botón de la lista de botones
 
     # =================================================================================================
 
 # ===================================== MEENSAJES =====================================================
     def send_message(self, sender, clients_to, message=None):
-        # If no message argument is provided, get the message from self.message_text
+        # Si no se es provisto un aargumento de mensaje, obtener el mensaje del campo de texto
         if message is None:
             message = self.message_text.get('1.0', 'end').strip()
             self.message_text.delete('1.0', 'end')
 
-        # If the message is empty, do nothing
+        # Si el mensaje esta vacio, no hacer nada
         if message == '':
             return
         
+        # Si el remitente es el servidor
         if sender == 'Servidor':
-            # Logic for server sending message
-            print(f'sender: {sender}\nclients_to: {clients_to}\nmessage: {message}')
-            if 'Global' in clients_to or not clients_to:
-                self.send_global_message(sender, message)
-            elif 'Global' not in clients_to and clients_to:
-                self.send_private_message(sender, message)
+            # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
+            if 'Global' in clients_to or not clients_to: 
+                self.send_global_message(sender, message) # Envia un mensaje global
+            # Si 'Global' no esta en la lista de clientes a los que se envio el mensaje
+            elif 'Global' not in clients_to and clients_to: 
+                self.send_private_message(sender, message) # Envia un mensaje privado
+        # En cualquier otro caso
         else:
-            # Logic for client sending message
+            # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
             if 'Global' in clients_to:
-                self.send_global_message(sender, message)
+                self.send_global_message(sender, message) # Envia un mensaje global
             else:
-                self.send_private_message(sender, message)
-
-
-    # Procesar los mensajes recibidos
-    def process_messages(self, client_socket, client_name):
-        while True:
-            message = self.receive_message(client_socket)# Recibe el mensaje del cliente
-            if message == 'DISCONNECT': # Si el mensaje es 'DISCONNECT'
-                self.client_buttons[client_name].config(bg='red' )# Cambia el color del botón a rojo
-                break
-            if message != '':# Si el mensaje no esta vacio
-                sender, clients_to, message_text = self.parse_message(message)# Parsea el mensaje
-                self.handle_parsed_message(sender, clients_to, message_text)# Maneja el mensaje parseado
+                self.send_private_message(sender, message) # Envia un mensaje privado
 
     # Recibe un mensaje del cliente
     def receive_message(self, client_socket):
         try:  # Agregar un bloque try-except para depuración
             data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
         except Exception as e:
-            print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
+            print(f'Error receiving data: {e}')  # Linea de error
             return 'DISCONNECT'
         return data.decode().strip()  # Los datos se vuelven bits
 
@@ -420,10 +431,8 @@ class ServerGUI:
 
         # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
         if 'Global' in clients_to or '' in clients_to:
-            print('Sending global message')  # Linea de depuración, puede ser eliminada
             self.send_global_message(sender, message_text)
         else:
-            print('Sending private messages')  # Linea de depuración, puede ser eliminada 
             self.selected_clients = clients_to  # Asigna los clientes a los que se envio el mensaje a la lista de clientes seleccionados
             self.send_private_message(sender, message_text)  # Envia un mensaje privado
             recipients = " y ".join(self.selected_clients)  # Obtiene los destinatarios del mensaje como una cadena de texto separada por 'y'
@@ -439,7 +448,6 @@ class ServerGUI:
 
     # Mensaje privado a un cliente específico
     def send_private_message(self, sender, message):
-        print(f'send_private_message called with selected_clients={self.selected_clients}')  # Linea de depuración, se puede eliminar
         for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
             if self.connections.get(selected_client): # Si el cliente esta conectado
                 message_aux = f'{sender} (Privado): {message}' # Mensaje privado del remitente y el mensaje
@@ -464,7 +472,6 @@ class ServerGUI:
 
         #Enviando respuesta al remitente
         response = f'Privado a {selected_clients_str}: {message}' # Respuesta al remitente, los clientes seleccionados y el mensaje
-        print(f'RESPONSESending response to {sender}: {response}') # Linea de depuración, se puede eliminar
         
         if sender == 'Servidor':# Si el remitente es el servidor
             self.log(f'Servidor (Privado) a {selected_clients_str}: {message}')
@@ -479,7 +486,6 @@ class ServerGUI:
         for client_name, client_info in self.connections.items():# Para cada cliente en la lista de conexiones
             status = 'connected' if client_info['connected'] else 'disconnected'# El cliente psa a estaar conectado si se encuentra en la lista de conexiones
             status_message += f'{client_name}: {status},\n' # Mensaje de estado de los clientes
-        print(status_message) # Linea de depuración, se puede eliminar
         self.send_hidden_message_to_all(status_message) # Envia el mensaje oculto a todos los clientes
 
     # Enviar un mensaje a todos los clientes
