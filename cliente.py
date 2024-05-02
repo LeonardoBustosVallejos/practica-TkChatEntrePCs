@@ -83,10 +83,10 @@ class ClientGUI:
         self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
         
         # Create a button for the server
-        self.server_button = tk.Button(self.buttons_frame, text='Server', bg='green', width=10, height= 1, command=lambda: self.select_client('Server'))
+        self.server_button = tk.Button(self.buttons_frame, text='Servidor', bg='green', width=10, height= 1, command=lambda: self.select_client('Servidor'))
         self.server_button.grid(row=0, column=0, padx=3, pady=3)
         # Add the server button to the dictionary of client buttons
-        self.client_buttons = {'Server': self.server_button}
+        self.client_buttons = {'Servidor': self.server_button}
 
         # Boton "Eliminar desconectados"
         self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
@@ -130,14 +130,14 @@ class ClientGUI:
     def remove_offline_button(self):
         # Eliminar los botones de los clientes desconectados
         for client_name in list(self.client_buttons.keys()):
-            if client_name != 'Server' and client_name not in self.connected_clients:
+            if client_name != 'Servidor' and client_name not in self.connected_clients:
                 self.client_buttons[client_name].destroy()
                 del self.client_buttons[client_name]
 
     def select_client(self, client_name):
         print(f"Client {client_name} selected.")
         # If 'Global' is selected, clear the list of selected clients
-        # If 'Server' is selected, do nothing
+        # If 'Servidor' is selected, do nothing
         if client_name == 'Global':
             self.selected_clients = ['Global']
         else:
@@ -186,7 +186,7 @@ class ClientGUI:
                 elif data.startswith('HIDDEN:'):
                     hidden_message = data[7:]
                     client_status_pairs = hidden_message.split(',')
-                    print(f'client_status_pairs: {client_status_pairs}') # Linea de debug, se puede eliminar
+                    print(f'client_status_pairs: {client_status_pairs}') # Debug line, can be removed
                     connected_clients = set()  # Create a set to store the clients received from the server
                     for pair in client_status_pairs:
                         if ':' in pair:  # Ignore empty strings
@@ -198,7 +198,7 @@ class ClientGUI:
 
                     # Find the clients that have disconnected
                     disconnected_clients = self.connected_clients - connected_clients
-                    print(f'disconnected_clients: {disconnected_clients}') # Linea de debug, se puede eliminar
+                    print(f'disconnected_clients: {disconnected_clients}') # Debug line, can be removed
                     for client in disconnected_clients:
                         self.update_buttons_colors(client, 'disconnected')  # Update the button color to red
 
@@ -208,7 +208,12 @@ class ClientGUI:
                 elif data == 'SERVIDOR CAIDO...':
                     self.server_broken()
                     break
-                
+
+                # Check if the message is a response to a sent message
+                elif data.startswith('RESPONSE'):
+                    # Update the GUI with the response
+                    self.update_sent_messages(data)
+
                 else:
                     self.enable_log()
                     self.log_text.insert(tk.END, data + '\n')
@@ -220,7 +225,7 @@ class ClientGUI:
                 self.connected = False
                 self.socket.close()
                 break
-    
+
     def log_recipient(self, recipient):
         if not recipient:
             recipient = 'Global'
@@ -308,7 +313,7 @@ class ClientGUI:
                 self.global_button.config(state=tk.NORMAL)
                 self.remove_offline_button.config(state=tk.NORMAL)
                 # Change the background color of the server button to green
-                self.client_buttons['Server'].config(bg='green')
+                self.client_buttons['Servidor'].config(bg='green')
                 self.messages_to_text.config(state=tk.NORMAL)
                 self.message_text.config(state=tk.NORMAL)
                 self.send_button.config(state=tk.NORMAL)
@@ -347,9 +352,11 @@ class ClientGUI:
 
     def update_server_button_color(self):
         # Change the background color of the server button to red
-        self.client_buttons['Server'].config(bg='red')
+        self.client_buttons['Servidor'].config(bg='red')
 
-    def send_message(self, message):
+    def send_message(self):
+        # Get the message from the text box
+        message = self.message_text.get('1.0', tk.END).strip()
         self.enable_log()
 
         # Verify if we are connected to the server
@@ -370,13 +377,6 @@ class ClientGUI:
             messagebox.showerror('Error', 'No se pudo enviar el mensaje: la conexión con el servidor se ha perdido.')
         
         self.disable_log()
-
-        # After the message is sent, listen for a response from the server
-        response = self.listen_for_response()
-
-
-        # Update the GUI with the response
-        self.update_sent_messages(response)
 
     def listen_for_response(self):
         try:

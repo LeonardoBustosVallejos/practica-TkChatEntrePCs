@@ -264,7 +264,7 @@ class ServerGUI:
 
     # desconectar un cliente
     def handle_disconnected_client(self, client):
-        if client != 'Server':
+        if client != 'Servidor':
             # Set the 'connected' status of the client to False
             self.connections[client]['connected'] = False
             # Print the status of all clients
@@ -282,10 +282,10 @@ class ServerGUI:
 
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
-            # If 'Server' is in clients_to, handle the message separately
-        if 'Server' in clients_to:
+            # If 'Servidor' is in clients_to, handle the message separately
+        if 'Servidor' in clients_to:
             self.handle_server_message(sender, message_text)
-            clients_to.remove('Server')  # Remove 'Server' from clients_to
+            clients_to.remove('Servidor')  # Remove 'Servidor' from clients_to
 
         if 'Global' in clients_to or '' in clients_to:
             print('Sending global message')  # Debug line
@@ -451,7 +451,7 @@ class ServerGUI:
 
         # Send a response back to the sender
         response = f'Privado a {selected_clients_str}: {message}'
-        print(f'Sending response to {sender}: {response}')
+        print(f'RESPONSESending response to {sender}: {response}')
         self.connections[sender]['connection'].sendall(response.encode())
 
     # Enviar un mensaje a un(unos) cliente(s) específico(s)
