@@ -438,6 +438,10 @@ class ServerGUI:
             recipients = " y ".join(self.selected_clients)  # Obtiene los destinatarios del mensaje como una cadena de texto separada por 'y'
             if sender != 'Servidor':  # Si el remitente no es el servidor
                 self.log(f'{sender} (Privado) a {recipients}: {message_text}')  # Muestra el mensaje en la ventana de log
+            # Asigna la copia de clients_to a la lista de clientes seleccionados
+            # Con el fin dee evitar que 'Servidor' esté dentro de los seleccionados
+            self.selected_clients = clients_to_copy
+
 
     # Mensaje global
     def send_global_message(self, sender, message):
