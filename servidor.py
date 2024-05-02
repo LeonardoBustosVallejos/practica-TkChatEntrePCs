@@ -295,7 +295,8 @@ class ServerGUI:
             self.selected_clients = clients_to  # Update selected_clients to match clients_to
             self.send_private_message(sender, message_text)
             recipients = " y ".join(self.selected_clients)
-            self.log(f'{sender} (Privado) a {recipients}: {message_text}')
+            if sender != 'Servidor':
+                self.log(f'{sender} (Privado) a {recipients}: {message_text}')
 
 
     # Manejar la conexión con un cliente
