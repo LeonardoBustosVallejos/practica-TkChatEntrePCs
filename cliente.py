@@ -126,6 +126,16 @@ class ClientGUI:
         self.log_text.insert(tk.END, message + '\n')
         self.log_text.see(tk.END)
         self.disable_log()
+    # Agregar un destinatario a la caja de texto de log
+
+    def log_recipient(self, recipient):
+        if recipient == '':
+            recipient = 'Global'
+        self.messages_to_text.config(state='normal')
+        self.messages_to_text.delete('1.0', 'end')
+        self.messages_to_text.insert('end', recipient)
+        self.messages_to_text.config(state='disabled')
+
 # =================================================================================================
     def remove_offline_button(self):
         # Eliminar los botones de los clientes desconectados
@@ -182,16 +192,18 @@ class ClientGUI:
                 break
 
     def handle_received_data(self, data):
+        print(f'Received data: {data}')  # debug line
         if not data:
             self.handle_server_disconnection()
         elif data.startswith('HIDDEN:'):
             self.handle_hidden_message(data[7:])
-        elif data == 'SERVIDOR CAIDO...':
+        elif data == 'Sistema: SERVIDOR CAIDO...':
+            print('Server is down')
             self.server_broken()
         elif data.startswith('RESPONSE'):
             self.update_sent_messages(data)
         else:
-            self.log_received_message(data)
+            self.log(data)
 
     def handle_server_disconnection(self):
         self.log('Conexión perdida con el servidor')
@@ -219,21 +231,8 @@ class ClientGUI:
         for client in disconnected_clients:
             self.update_buttons_colors(client, 'disconnected')
 
-    def log_received_message(self, message):
-        self.enable_log()
-        self.log_text.insert(tk.END, message + '\n')
-        self.log_text.see(tk.END)
-        self.disable_log()
-
-    def log_recipient(self, recipient):
-        if recipient == '':
-            recipient = 'Global'
-        self.messages_to_text.config(state='normal')
-        self.messages_to_text.delete('1.0', 'end')
-        self.messages_to_text.insert('end', recipient)
-        self.messages_to_text.config(state='disabled')
-
     def server_broken(self):
+        print('Server is bvroken')
         self.log('El servidor ha caído')
         self.disconnect_from_server()
 
@@ -333,21 +332,26 @@ class ClientGUI:
                     break
 
     def disconnect_from_server(self):
-        # Enviar mensaje de desconexión al servidor
-        if self.connected:
-            self.socket.sendall('DISCONNECT'.encode())
-        self.connected = False
-        self.socket.close()
-        self.log('Desconectado del servidor')
-        self.connect_button.config(state=tk.NORMAL)
-        self.disconnect_button.config(state=tk.DISABLED)
-        self.global_button.config(state=tk.DISABLED)
-        self.remove_offline_button.config(state=tk.DISABLED)
-        # Schedule the GUI update to run in the main thread
-        self.master.after(0, self.update_server_button_color)
-        self.messages_to_text.config(state=tk.DISABLED)
-        self.message_text.config(state=tk.DISABLED)
-        self.send_button.config(state=tk.DISABLED)
+        print('Desconectando del servidor...')
+        try:
+            # Enviar mensaje de desconexión al servidor
+            if self.connected:
+                self.socket.sendall('DISCONNECT'.encode())
+            self.socket.close()
+        except (ConnectionResetError, ConnectionRefusedError):
+            print('Error al desconectar del servidor')
+        finally:
+            self.connected = False
+            self.log('Desconectado del servidor')
+            self.connect_button.config(state=tk.NORMAL)
+            self.disconnect_button.config(state=tk.DISABLED)
+            self.global_button.config(state=tk.DISABLED)
+            self.remove_offline_button.config(state=tk.DISABLED)
+            # Schedule the GUI update to run in the main thread
+            self.master.after(0, self.update_server_button_color)
+            self.messages_to_text.config(state=tk.DISABLED)
+            self.message_text.config(state=tk.DISABLED)
+            self.send_button.config(state=tk.DISABLED)
 
     def update_server_button_color(self):
         # Change the background color of the server button to red

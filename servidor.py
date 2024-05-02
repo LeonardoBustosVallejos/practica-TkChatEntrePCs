@@ -85,7 +85,7 @@ class ServerGUI:
         self.buttons_frame.bind('<Configure>', lambda e: self.canvas.configure(scrollregion=self.canvas.bbox('all')))
 
         # Boton "Eliminar desconectados"
-        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline)
+        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline, state=tk.DISABLED)
         self.remove_offline_button.place(x=510, y=280)
 
         # Destinatarios
@@ -135,6 +135,8 @@ class ServerGUI:
     def log_recipient(self, recipient):
         if not recipient:
             recipient = 'Global'
+        elif isinstance(recipient, list):
+            recipient = ', '.join(recipient)
         self.messages_to_text.config(state='normal')
         self.messages_to_text.delete('1.0', 'end')
         self.messages_to_text.insert('end', recipient)
@@ -153,6 +155,7 @@ class ServerGUI:
         self.stop_button.config(state=tk.NORMAL)
         self.message_text.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
+        self.remove_offline_button.config(state=tk.NORMAL)
 
         self.status_label.config(text='Iniciado')
 
@@ -200,8 +203,9 @@ class ServerGUI:
             self.server_running = False # El server ya no esta corriendo
             self.send_system_message('SERVIDOR CAIDO...')
 
-            for conn in self.connections.values():
+            for conn_dict in self.connections.values():
                 try:
+                    conn = conn_dict['connection']
                     conn.close()# Cierra la conexion con el cliente
                 except Exception as e:
                     print(f'Error closing connection: {e}')
@@ -214,6 +218,7 @@ class ServerGUI:
             # Habilita y deshabilita los botones
             self.start_button.config(state=tk.NORMAL)
             self.stop_button.config(state=tk.DISABLED)
+            self.remove_offline_button.config(state=tk.DISABLED)
             self.message_text.config(state=tk.DISABLED)
             self.send_button.config(state=tk.DISABLED)
             self.global_button.config(state=tk.DISABLED)
@@ -444,7 +449,7 @@ class ServerGUI:
             else:
                 self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
 
-        self.send_response_to_sender(sender, self.selected_clients ,message)# Envia una respuesta al remitente
+        self.send_response_to_sender(sender, self.selected_clients, message)# Envia una respuesta al remitente
 
     def send_response_to_sender(self, sender, selected_clients, message):
         # Convert the list of selected clients to a comma-separated string
