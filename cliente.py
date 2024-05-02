@@ -166,7 +166,6 @@ class ClientGUI:
         self.messages_to_text.config(state='disabled')
         print(f'selected_clients: {self.selected_clients}') # Linea de debug, se puede eliminar
 
-
     def on_close(self):
         self.disconnect_from_server()
         self.master.destroy()# Cerrar la ventana
@@ -174,60 +173,60 @@ class ClientGUI:
     def receive_messages(self):
         while self.connected:
             try:
-                # Receive data from the server
                 data = self.socket.recv(1024).decode('utf-8')
-
-                # If there's no data, the server closed the connection
-                if not data:
-                    self.log('Conexión perdida con el servidor')
-                    self.disconnect_from_server()
-                    break
-                
-                elif data.startswith('HIDDEN:'):
-                    hidden_message = data[7:]
-                    client_status_pairs = hidden_message.split(',')
-                    print(f'client_status_pairs: {client_status_pairs}') # Debug line, can be removed
-                    connected_clients = set()  # Create a set to store the clients received from the server
-                    for pair in client_status_pairs:
-                        if ':' in pair:  # Ignore empty strings
-                            client, status = pair.split(':')
-                            client = client.strip()  # Remove leading/trailing whitespace
-                            status = status.strip()  # Remove leading/trailing whitespace
-                            self.update_buttons(client, status)
-                            connected_clients.add(client)  # Add the client to the set of received clients
-
-                    # Find the clients that have disconnected
-                    disconnected_clients = self.connected_clients - connected_clients
-                    print(f'disconnected_clients: {disconnected_clients}') # Debug line, can be removed
-                    for client in disconnected_clients:
-                        self.update_buttons_colors(client, 'disconnected')  # Update the button color to red
-
-                    self.connected_clients = connected_clients  # Update the set of connected clients
-
-                # If the server sends 'SERVIDOR CAIDO...', disconnect
-                elif data == 'SERVIDOR CAIDO...':
-                    self.server_broken()
-                    break
-
-                # Check if the message is a response to a sent message
-                elif data.startswith('RESPONSE'):
-                    # Update the GUI with the response
-                    self.update_sent_messages(data)
-
-                else:
-                    self.enable_log()
-                    self.log_text.insert(tk.END, data + '\n')
-                    self.log_text.see(tk.END)
-                    self.disable_log()
-
+                self.handle_received_data(data)
             except Exception as e:
                 print(e)
                 self.connected = False
                 self.socket.close()
                 break
 
+    def handle_received_data(self, data):
+        if not data:
+            self.handle_server_disconnection()
+        elif data.startswith('HIDDEN:'):
+            self.handle_hidden_message(data[7:])
+        elif data == 'SERVIDOR CAIDO...':
+            self.server_broken()
+        elif data.startswith('RESPONSE'):
+            self.update_sent_messages(data)
+        else:
+            self.log_received_message(data)
+
+    def handle_server_disconnection(self):
+        self.log('Conexión perdida con el servidor')
+        self.disconnect_from_server()
+
+    def handle_hidden_message(self, hidden_message):
+        client_status_pairs = hidden_message.split(',')
+        connected_clients = self.get_connected_clients(client_status_pairs)
+        self.update_disconnected_clients(connected_clients)
+        self.connected_clients = connected_clients
+
+    def get_connected_clients(self, client_status_pairs):
+        connected_clients = set()
+        for pair in client_status_pairs:
+            if ':' in pair:
+                client, status = pair.split(':')
+                client = client.strip()
+                status = status.strip()
+                self.update_buttons(client, status)
+                connected_clients.add(client)
+        return connected_clients
+
+    def update_disconnected_clients(self, connected_clients):
+        disconnected_clients = self.connected_clients - connected_clients
+        for client in disconnected_clients:
+            self.update_buttons_colors(client, 'disconnected')
+
+    def log_received_message(self, message):
+        self.enable_log()
+        self.log_text.insert(tk.END, message + '\n')
+        self.log_text.see(tk.END)
+        self.disable_log()
+
     def log_recipient(self, recipient):
-        if not recipient:
+        if recipient == '':
             recipient = 'Global'
         self.messages_to_text.config(state='normal')
         self.messages_to_text.delete('1.0', 'end')
