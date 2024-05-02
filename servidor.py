@@ -15,7 +15,6 @@ class ServerGUI:
         master.geometry('800x380')
         master.protocol("WM_DELETE_WINDOW", lambda: self.stop_server(close_gui=True))# Al cerrar la ventana se detiene el server
         self.client_var = tk.StringVar()   # Variable para el nombre del cliente
-
 # ======================================= IZQUIERDA DE LA GUI =======================================
 
         # Etiqueta de nombre del servidor
@@ -413,27 +412,23 @@ class ServerGUI:
 
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
+        clients_to_copy = clients_to.copy()  # Crea una copia de clients_to
+
         # Si 'Servidor' esta en la lista de clientes a los que se envio el mensaje
-        if 'Servidor' in clients_to:
-            self.handle_server_message(sender, message_text)# Maneja el mensaje del servidor
-            clients_to.remove('Servidor')  # Remueve 'Servidor' de la lista de clientes a los que se envio el mensaje
+        if 'Servidor' in clients_to_copy:
+            clients_to_copy.remove('Servidor')  # Remueve 'Servidor' de la lista de clientes a los que se envio el mensaje
 
         # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
         if 'Global' in clients_to or '' in clients_to:
-            print('Sending global message')  # Linea de depuración, se puede eliminar
+            print('Sending global message')  # Linea de depuración, puede ser eliminada
             self.send_global_message(sender, message_text)
         else:
-            print('Sending private messages')  # Linea de depuración, se puede eliminar
+            print('Sending private messages')  # Linea de depuración, puede ser eliminada 
             self.selected_clients = clients_to  # Asigna los clientes a los que se envio el mensaje a la lista de clientes seleccionados
-            self.send_private_message(sender, message_text)# Envia un mensaje privado
-            recipients = " y ".join(self.selected_clients)# Obtiene los destinatarios del mensaje privado como una cadena de texto separada por 'y'
-            if sender != 'Servidor': # Si el remitente no es el servidor
-                self.log(f'{sender} (Privado) a {recipients}: {message_text}')# Muestra el mensaje en la ventana de log
-
-    # Manejar el mensaje del servidor
-    def handle_server_message(self, sender, message):
-        print(f'{sender} (Servidor): {message}') # Linea de depuración, se puede eliminar
-        self.log(f'{sender} (Servidor): {message}') # Muestra el mensaje en la ventana de log, como un mensaje del servidor
+            self.send_private_message(sender, message_text)  # Envia un mensaje privado
+            recipients = " y ".join(self.selected_clients)  # Obtiene los destinatarios del mensaje como una cadena de texto separada por 'y'
+            if sender != 'Servidor':  # Si el remitente no es el servidor
+                self.log(f'{sender} (Privado) a {recipients}: {message_text}')  # Muestra el mensaje en la ventana de log
 
     # Mensaje global
     def send_global_message(self, sender, message):
