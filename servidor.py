@@ -50,7 +50,7 @@ class ServerGUI:
         self.message_text.place_configure(x=20, y=290)
 
         # Boton para enviar mensajes
-        self.send_button = tk.Button(master, text='Enviar', command=self.send_message, state=tk.DISABLED)
+        self.send_button = tk.Button(master, text='Enviar', command=lambda: self.send_message(sender='Servidor', clients_to=self.selected_clients, message=None), state=tk.DISABLED)
         self.send_button.place_configure(x=180, y=347)
 # =================================================================================================
 
@@ -453,7 +453,13 @@ class ServerGUI:
         # Send a response back to the sender
         response = f'Privado a {selected_clients_str}: {message}'
         print(f'RESPONSESending response to {sender}: {response}')
-        self.connections[sender]['connection'].sendall(response.encode())
+        
+        if sender == 'Servidor':
+            self.log(f'Servidor (Privado) a {selected_clients_str}: {message}')
+            pass
+        else:
+            # Existing logic for client sending response
+            self.connections[sender]['connection'].sendall(response.encode())
 
     # Enviar un mensaje a un(unos) cliente(s) específico(s)
     def send_message_to_client(self, sender, client, message):
@@ -462,7 +468,7 @@ class ServerGUI:
         except Exception as e:
             self.log(f'Error sending message from {sender} to {client}: {e}')
             self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
-
+            
     def send_message(self, sender, clients_to, message=None):
         # If no message argument is provided, get the message from self.message_text
         if message is None:
@@ -472,15 +478,21 @@ class ServerGUI:
         # If the message is empty, do nothing
         if message == '':
             return
-
-        # If the selected client is 'Global', send the message to all clients
-        if 'Global' in clients_to:
-            self.send_global_message(sender, message)
-        # If the selected client is not 'Global', send the message to the selected client
+        
+        if sender == 'Servidor':
+            # Logic for server sending message
+            print(f'sender: {sender}\nclients_to: {clients_to}\nmessage: {message}')
+            if 'Global' in clients_to or not clients_to:
+                self.send_global_message(sender, message)
+            elif 'Global' not in clients_to and clients_to:
+                self.send_private_message(sender, message)
         else:
-            self.send_private_message(sender, message)   
-    #   =================================================================================================
-
+            # Logic for client sending message
+            if 'Global' in clients_to:
+                self.send_global_message(sender, message)
+            else:
+                self.send_private_message(sender, message)
+# =================================================================================================
 root = tk.Tk()
 server_gui = ServerGUI(root)
 root.resizable(0,0)
