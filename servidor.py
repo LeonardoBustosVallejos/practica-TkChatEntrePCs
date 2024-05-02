@@ -238,25 +238,72 @@ class ServerGUI:
             self.selected_client = 'Global'
             self.clients_to = ''
         else:
-            # If the client is in the list of selected clients, remove it
+            # Si el cliente esta en la lista de clientes seleccionados, elimínalo
             if client_name in self.selected_clients:
                 self.selected_clients.remove(client_name)
             else:
-                # If the client is not in the list of selected clients, add it
+                # Si el cliente no esta en la lista de clientes seleccionados, añadelo
                 self.selected_clients.append(client_name)
 
-            # If there are no selected clients, select 'Global'
+            # SSi no hay clientes seleccionados, selecciona el cliente global
             if len(self.selected_clients) == 0:
                 self.selected_client = 'Global'
             else:
-                # If there are selected clients, select the first one in the list
+                # Si hay clientes seleccionados, selecciona el primer cliente de la lista
                 self.selected_client = self.selected_clients[0]
 
+        # Muestra los destinatarios en la ventana de messages_to_text
         self.log_recipient(self.selected_clients)
+
+    # Elimina el cliente de la lista de clientes seleccionados
+    def remove_selected_client(self, client):
+        self.selected_clients.remove(client)
+# =================================================================================================
+
+# ======================================= CONEXIONES ===============================================
+    # Manejar la conexión con un cliente
+    def handle_connection(self, client_socket, client_address, client_name):
+        # ñadir el cliente a la lista de conexiones
+        self.connections[client_name] = {'connection': client_socket, 'connected': True}
+        # Imprime el estado de todos los clientes
+        self.print_client_status()
+        self.initialize_connection(client_name)
+        self.process_messages(client_socket, client_name)
+        self.send_system_message(f'Cliente {client_name} se ha desconectado.')
+        self.terminate_connection(client_socket, client_name)
+
+    # Inicializar la conexión con el cliente
+    def initialize_connection(self, client_name):
+        self.send_system_message(f'Cliente {client_name} se ha conectado') # Muestra el mensaje en la ventana de log
+        self.log(f'Cliente {client_name} se ha conectado.')
+        self.global_button.config(state='normal')  # Habilita el botón global
+        if client_name in self.client_buttons:
+            self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
+
+    # Terminar la conexión con el cliente
+    def terminate_connection(self, client_socket, client_name):
+        client_socket.close() # Cierra la conexion con el cliente
+        if client_name in self.connections:
+            del self.connections[client_name]# Elimina la conexion del cliente
+        self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
+        self.log(f"Conexion cerrada con {client_name}")# Muestra el mensaje en la ventana de log 
+        # Imprime el estado de todos los clientes
+        self.print_client_status()
+
+    # Desconectar un cliente
+    def handle_disconnected_client(self, client):
+        if client != 'Servidor':
+            # Set the connected status of the client to False
+            self.connections[client]['connected'] = False
+            # Imprime el estado de todos los clientes
+            self.print_client_status()  
+            self.log(f'{client} is not connected')
+            self.remove_selected_client(client) 
+            self.log_recipient(self.selected_clients)  # Muestra los destinatarios en la ventana de messages_to_text
     # =================================================================================================
 
-    # ======================= CONEXIONES =======================
-    # actualizar el menu de conectados
+    # ======================= BOTONES =======================
+        # actualizar el menu de conectados
     def update_client_buttons(self):
         # actualiza los clientes conectados
         for name in self.connections.keys():
@@ -267,113 +314,6 @@ class ServerGUI:
             # Crea un boton para el cliente
             self.add_client_button(name)
 
-    # desconectar un cliente
-    def handle_disconnected_client(self, client):
-        if client != 'Servidor':
-            # Set the 'connected' status of the client to False
-            self.connections[client]['connected'] = False
-            # Print the status of all clients
-            self.print_client_status()  # Debug line, can be removed
-            self.log(f'{client} is not connected')
-            self.remove_selected_client(client) 
-            self.log_recipient(self.selected_clients)  # Show the recipients in the messages_to_text window
-
-    def remove_selected_client(self, client):
-        self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
-
-    def handle_server_message(self, sender, message):
-        print(f'{sender} (Servidor): {message}')
-        self.log(f'{sender} (Servidor): {message}')
-
-    # Manejar los mensajes recibidos
-    def handle_parsed_message(self, sender, clients_to, message_text):
-            # If 'Servidor' is in clients_to, handle the message separately
-        if 'Servidor' in clients_to:
-            self.handle_server_message(sender, message_text)
-            clients_to.remove('Servidor')  # Remove 'Servidor' from clients_to
-
-        if 'Global' in clients_to or '' in clients_to:
-            print('Sending global message')  # Debug line
-            self.send_global_message(sender, message_text)
-        else:
-            print('Sending private messages')  # Debug line
-            self.selected_clients = clients_to  # Update selected_clients to match clients_to
-            self.send_private_message(sender, message_text)
-            recipients = " y ".join(self.selected_clients)
-            if sender != 'Servidor':
-                self.log(f'{sender} (Privado) a {recipients}: {message_text}')
-
-
-    # Manejar la conexión con un cliente
-    def handle_connection(self, client_socket, client_address, client_name):
-        # Add the new client to self.connections
-        self.connections[client_name] = {'connection': client_socket, 'connected': True}
-            # Print the status of all clients
-        self.print_client_status()
-        self.initialize_connection(client_name)
-        self.process_messages(client_socket, client_name)
-        self.send_system_message(f'Cliente {client_name} se ha desconectado.')
-        self.terminate_connection(client_socket, client_name)
-
-    def print_client_status(self):
-        status_message = ''
-        for client_name, client_info in self.connections.items():
-            status = 'connected' if client_info['connected'] else 'disconnected'
-            status_message += f'{client_name}: {status},\n'
-        print(status_message)
-        self.send_hidden_message_to_all(status_message)
-
-    def send_hidden_message_to_all(self, message):
-        for client_name, client_info in self.connections.items():
-            if client_info['connected']:
-                try:
-                    client_info['connection'].sendall(('HIDDEN:' + message).encode())
-                except Exception as e:
-                    self.log(f'Error sending hidden message to {client_name}: {e}')
-
-    def initialize_connection(self, client_name):
-        self.send_system_message(f'Cliente {client_name} se ha conectado') # Muestra el mensaje en la ventana de log
-        self.log(f'Cliente {client_name} se ha conectado.')
-        self.global_button.config(state='normal')  # Habilita el botón global
-        if client_name in self.client_buttons:
-            self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
-
-    def parse_message(self, message):
-        parts = message.split('//')
-        sender = parts[0].split('-')[1]
-        clients_to = [client.strip("'") for client in parts[1].split('-')[1].strip('[]').split(', ')]
-        message_text = parts[2].split('.')[1]
-        return sender, clients_to, message_text
-
-    def process_messages(self, client_socket, client_name):
-        while True:
-            message = self.receive_message(client_socket)
-            if message == 'DISCONNECT':
-                self.client_buttons[client_name].config(bg='red')
-                break
-            if message != '':
-                sender, clients_to, message_text = self.parse_message(message)
-                self.handle_parsed_message(sender, clients_to, message_text)
-
-    def terminate_connection(self, client_socket, client_name):
-        client_socket.close() # Cierra la conexion con el cliente
-        if client_name in self.connections:
-            del self.connections[client_name]# Elimina la conexion del cliente
-        self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
-        self.log(f"Conexion cerrada con {client_name}")# Muestra el mensaje en la ventana de log 
-        # Print the status of all clients
-        self.print_client_status()
-        
-    def receive_message(self, client_socket):
-        try:  # Agregar un bloque try-except para depuración
-            data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
-        except Exception as e:
-            print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
-            return 'DISCONNECT'
-        return data.decode().strip()  # Los datos se vuelven bits
-    # =================================================================================================
-
-    # ======================= BOTONES =======================
     # Crear un botón para un cliente
     def create_button(self, client_name):
         button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
@@ -417,63 +357,7 @@ class ServerGUI:
 
     # =================================================================================================
 
-    # ======================= ENVIAR MENSAJE =======================
-# ======================= ENVIAR MENSAJE =======================
-    def send_system_message(self, message, exclude_client=None):
-        message_aux = f'Sistema: {message}'
-        for client_name, client_info in list(self.connections.items()):  # Use list to avoid RuntimeError
-            if client_name != exclude_client:
-                try:
-                    self.disable_text()
-                    client_info['connection'].sendall(message_aux.encode())  # Send the message
-                    self.enable_text()
-                except ConnectionResetError:
-                    # The client has disconnected abruptly
-                    self.log(f'Cliente {client_name} se ha desconectado abruptamente.')
-                    # Remove the client from the connections dictionary
-                    del self.connections[client_name]
-
-    # Mensaje global
-    def send_global_message(self, sender, message):
-        for client_name, client_info in self.connections.items(): # Envia el mensaje a todos los clientes
-            message_aux = f'{sender} (Global): {message}'
-            client_info['connection'].sendall(message_aux.encode()) # Envia el mensaje
-        self.log(message_aux)# Muestra el mensaje en la ventana de log
-
-    def send_private_message(self, sender, message):
-        print(f'send_private_message called with selected_clients={self.selected_clients}')  # Debug line
-        for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
-            if self.connections.get(selected_client):
-                message_aux = f'{sender} (Privado): {message}' # Muestra el mensaje en la ventana de log
-                self.send_message_to_client(sender, selected_client, message_aux) # Envia el mensaje al cliente seleccionado
-            else:
-                self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
-
-        self.send_response_to_sender(sender, self.selected_clients, message)# Envia una respuesta al remitente
-
-    def send_response_to_sender(self, sender, selected_clients, message):
-        # Convert the list of selected clients to a comma-separated string
-        selected_clients_str = ', '.join(selected_clients)
-
-        # Send a response back to the sender
-        response = f'Privado a {selected_clients_str}: {message}'
-        print(f'RESPONSESending response to {sender}: {response}')
-        
-        if sender == 'Servidor':
-            self.log(f'Servidor (Privado) a {selected_clients_str}: {message}')
-            pass
-        else:
-            # Existing logic for client sending response
-            self.connections[sender]['connection'].sendall(response.encode())
-
-    # Enviar un mensaje a un(unos) cliente(s) específico(s)
-    def send_message_to_client(self, sender, client, message):
-        try:
-            self.connections[client]['connection'].sendall(message.encode())# Envia el mensaje al cliente
-        except Exception as e:
-            self.log(f'Error sending message from {sender} to {client}: {e}')
-            self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
-            
+# ===================================== MEENSAJES =====================================================
     def send_message(self, sender, clients_to, message=None):
         # If no message argument is provided, get the message from self.message_text
         if message is None:
@@ -497,6 +381,135 @@ class ServerGUI:
                 self.send_global_message(sender, message)
             else:
                 self.send_private_message(sender, message)
+
+
+    # Procesar los mensajes recibidos
+    def process_messages(self, client_socket, client_name):
+        while True:
+            message = self.receive_message(client_socket)# Recibe el mensaje del cliente
+            if message == 'DISCONNECT': # Si el mensaje es 'DISCONNECT'
+                self.client_buttons[client_name].config(bg='red' )# Cambia el color del botón a rojo
+                break
+            if message != '':# Si el mensaje no esta vacio
+                sender, clients_to, message_text = self.parse_message(message)# Parsea el mensaje
+                self.handle_parsed_message(sender, clients_to, message_text)# Maneja el mensaje parseado
+
+    # Recibe un mensaje del cliente
+    def receive_message(self, client_socket):
+        try:  # Agregar un bloque try-except para depuración
+            data = client_socket.recv(1024)  # Se recibio tantos datos en como mensaje
+        except Exception as e:
+            print(f'Error receiving data: {e}')  # Linea de depuración, se puede eliminar
+            return 'DISCONNECT'
+        return data.decode().strip()  # Los datos se vuelven bits
+
+    # Parsea el mensaje recibido del cliente
+    def parse_message(self, message):
+        parts = message.split('//') # Divide el mensaje en partes
+        sender = parts[0].split('-')[1]# Obtiene el nombre del cliente que envio el mensaje
+        clients_to = [client.strip("'") for client in parts[1].split('-')[1].strip('[]').split(', ')]# Obtiene los clientes a los que se envio el mensaje
+        message_text = parts[2].split('.')[1]# Obtiene el texto del mensaje
+        return sender, clients_to, message_text# Retorna el nombre del cliente que envio el mensaje, los clientes a los que se envio el mensaje y el texto del mensaje
+
+    # Manejar los mensajes recibidos
+    def handle_parsed_message(self, sender, clients_to, message_text):
+        # Si 'Servidor' esta en la lista de clientes a los que se envio el mensaje
+        if 'Servidor' in clients_to:
+            self.handle_server_message(sender, message_text)# Maneja el mensaje del servidor
+            clients_to.remove('Servidor')  # Remueve 'Servidor' de la lista de clientes a los que se envio el mensaje
+
+        # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
+        if 'Global' in clients_to or '' in clients_to:
+            print('Sending global message')  # Linea de depuración, se puede eliminar
+            self.send_global_message(sender, message_text)
+        else:
+            print('Sending private messages')  # Linea de depuración, se puede eliminar
+            self.selected_clients = clients_to  # Asigna los clientes a los que se envio el mensaje a la lista de clientes seleccionados
+            self.send_private_message(sender, message_text)# Envia un mensaje privado
+            recipients = " y ".join(self.selected_clients)# Obtiene los destinatarios del mensaje privado como una cadena de texto separada por 'y'
+            if sender != 'Servidor': # Si el remitente no es el servidor
+                self.log(f'{sender} (Privado) a {recipients}: {message_text}')# Muestra el mensaje en la ventana de log
+
+    # Manejar el mensaje del servidor
+    def handle_server_message(self, sender, message):
+        print(f'{sender} (Servidor): {message}') # Linea de depuración, se puede eliminar
+        self.log(f'{sender} (Servidor): {message}') # Muestra el mensaje en la ventana de log, como un mensaje del servidor
+
+    # Mensaje global
+    def send_global_message(self, sender, message):
+        for client_name, client_info in self.connections.items(): # Envia el mensaje a todos los clientes
+            message_aux = f'{sender} (Global): {message}'# Mensaje global del remitente y el mensaje
+            client_info['connection'].sendall(message_aux.encode()) # Envia el mensaje
+        self.log(message_aux)# Muestra el mensaje en la ventana de log
+
+    # Mensaje privado a un cliente específico
+    def send_private_message(self, sender, message):
+        print(f'send_private_message called with selected_clients={self.selected_clients}')  # Linea de depuración, se puede eliminar
+        for selected_client in self.selected_clients[:]: # Envia el mensaje a los clientes seleccionados
+            if self.connections.get(selected_client): # Si el cliente esta conectado
+                message_aux = f'{sender} (Privado): {message}' # Mensaje privado del remitente y el mensaje
+                self.send_message_to_client(sender, selected_client, message_aux) # Envia el mensaje al cliente seleccionado
+            else:
+                self.handle_disconnected_client(selected_client)# Si el cliente no esta conectado
+
+        self.send_response_to_sender(sender, self.selected_clients, message)# Envia una respuesta al remitente
+
+    # Enviar un mensaje a un(unos) cliente(s) específico(s)
+    def send_message_to_client(self, sender, client, message):
+        try:
+            self.connections[client]['connection'].sendall(message.encode())# Envia el mensaje al cliente seleccionado
+        except Exception as e:
+            self.log(f'Error sending message from {sender} to {client}: {e}')
+            self.selected_clients.remove(client)# Elimina el cliente de la lista de clientes seleccionados
+
+    # Enviar una respuesta al remitente
+    def send_response_to_sender(self, sender, selected_clients, message):
+        # Convierte la lista de clientes seleccionados en una cadena de texto
+        selected_clients_str = ', '.join(selected_clients)
+
+        #Enviando respuesta al remitente
+        response = f'Privado a {selected_clients_str}: {message}' # Respuesta al remitente, los clientes seleccionados y el mensaje
+        print(f'RESPONSESending response to {sender}: {response}') # Linea de depuración, se puede eliminar
+        
+        if sender == 'Servidor':# Si el remitente es el servidor
+            self.log(f'Servidor (Privado) a {selected_clients_str}: {message}')
+            pass
+        else:
+            # Envia la respuesta al remitente si no es el servidor
+            self.connections[sender]['connection'].sendall(response.encode())
+
+    # Imprimir el estado de los clientes
+    def print_client_status(self):
+        status_message = '' # Mensaje de estado de los clientes en blanco
+        for client_name, client_info in self.connections.items():# Para cada cliente en la lista de conexiones
+            status = 'connected' if client_info['connected'] else 'disconnected'# El cliente psa a estaar conectado si se encuentra en la lista de conexiones
+            status_message += f'{client_name}: {status},\n' # Mensaje de estado de los clientes
+        print(status_message) # Linea de depuración, se puede eliminar
+        self.send_hidden_message_to_all(status_message) # Envia el mensaje oculto a todos los clientes
+
+    # Enviar un mensaje a todos los clientes
+    def send_hidden_message_to_all(self, message):
+        for client_name, client_info in self.connections.items():
+            if client_info['connected']:# Si el cliente esta conectado
+                try:
+                    client_info['connection'].sendall(('HIDDEN:' + message).encode())# Envia el mensaje al cliente + el mensaje oculto
+                except Exception as e:
+                    self.log(f'Error sending hidden message to {client_name}: {e}')
+
+    # Enviar un mensaje a todos los clientes como el sistema
+    def send_system_message(self, message, exclude_client=None):
+        message_aux = f'Sistema: {message}' # Mensaje del sistema
+        for client_name, client_info in list(self.connections.items()):  # Usa list() para evitar RuntimeError
+            if client_name != exclude_client: # Si el cliente no es el excluido
+                try:
+                    self.disable_text()
+                    client_info['connection'].sendall(message_aux.encode())  # Envia el mensaje al cliente que no fue excluido
+                    self.enable_text()
+                except ConnectionResetError:
+                    # The client has disconnected abruptly
+                    self.log(f'Cliente {client_name} se ha desconectado abruptamente.') # Muestra el mensaje en la ventana de log
+                    # Remove the client from the connections dictionary
+                    del self.connections[client_name] # Elimina la conexion del cliente
 # =================================================================================================
 root = tk.Tk()
 server_gui = ServerGUI(root)
