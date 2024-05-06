@@ -283,7 +283,7 @@ class ServerGUI:
         self.log(f'Cliente {client_name} se ha conectado.')
         self.global_button.config(state='normal')  # Habilita el botón global
         if client_name in self.client_buttons:
-            self.client_buttons[client_name].config(bg='green') # Cambia el color del botón a verde
+            self.update_buttons_green(client_name)
 
     # Terminar la conexión con el cliente
     def terminate_connection(self, client_socket, client_name):
@@ -313,7 +313,7 @@ class ServerGUI:
             try:
                 message = self.receive_message(client_socket)  # Recibe el mensaje del cliente
                 if message == 'DISCONNECT':  # Si el mensaje es 'DISCONNECT'
-                    self.client_buttons[client_name].config(bg='red')  # Cambia el color del botón a rojo
+                    self.update_buttons_red(client_name)  # Cambia el color del botón a rojo
                     break
                 if message.startswith('ADVERTENCIA: '):
                     self.handle_parsed_message('Servidor', ['Global'], message)
@@ -335,7 +335,7 @@ class ServerGUI:
         if client not in self.inactive_clients: 
             self.inactive_clients.append(client)
             # Cambia el color del botón a amarillo
-            self.client_buttons[client].config(bg='yellow')
+            self.update_buttons_yellow(client)
             # Muestra el mensaje en la ventana de log
             self.log(f"{message_text}") 
         else:
@@ -347,12 +347,34 @@ class ServerGUI:
     def handle_reactived_client(self, client):
         if client in self.inactive_clients:
             self.inactive_clients.remove(client)
-            self.client_buttons[client].config(bg='green')  # Cambia el color del botón a verde
+            self.update_buttons_green(client)
             self.send_system_message(f'Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
             self.log(f'Sitema: Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
     # =================================================================================================
 
     # ======================= BOTONES =======================
+    def update_buttons_green(self, client_name):
+        for client_name in self.connections.keys():
+            if client_name in self.client_buttons:
+                self.client_buttons[client_name].config(bg='green')
+    
+    def update_buttons_yellow(self, client_name):
+        for client_name in self.inactive_clients:
+            if client_name in self.client_buttons:
+                self.client_buttons[client_name].config(bg='yellow')
+    
+    def update_buttons_red(self, client_name):
+        for client_name in self.connections.keys():
+            if client_name in self.client_buttons:
+                self.client_buttons[client_name].config(bg='red')
+
+    # Crear un botón para un cliente
+    def create_button(self, client_name):
+        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
+        button.bind('<Button-1>', lambda e: self.select_client(client_name))
+        button.update_idletasks()
+        return button
+
         # actualizar el menu de conectados
     def update_client_buttons(self):
         # actualiza los clientes conectados
@@ -364,12 +386,12 @@ class ServerGUI:
             # Crea un boton para el cliente
             self.add_client_button(name)
 
-    # Crear un botón para un cliente
-    def create_button(self, client_name):
-        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
-        button.bind('<Button-1>', lambda e: self.select_client(client_name))
-        button.update_idletasks()
-        return button
+    # Añadir un botón para un cliente
+    def add_client_button(self, client_name):
+        button = self.create_button(client_name)# Crea un botón para el cliente
+        button_width = button.winfo_reqwidth()# Obtiene el ancho del botón
+        self.calculate_position(button_width)# Calcula la posición del botón
+        self.add_button_to_grid_and_dict(button, client_name)# Añade el botón al grid y al diccionario
 
     # Calcular la posición de los botones
     def calculate_position(self, button_width):
@@ -387,13 +409,6 @@ class ServerGUI:
         # Coloca el botón en la fila y columna correspondiente
         button.grid(row=self.current_row, column=self.current_column, padx=3, pady=3)
         self.client_buttons[client_name] = button # Añade el botón al diccionario de botones
-
-    # Añadir un botón para un cliente
-    def add_client_button(self, client_name):
-        button = self.create_button(client_name)# Crea un botón para el cliente
-        button_width = button.winfo_reqwidth()# Obtiene el ancho del botón
-        self.calculate_position(button_width)# Calcula la posición del botón
-        self.add_button_to_grid_and_dict(button, client_name)# Añade el botón al grid y al diccionario
 
     # Eliminar clientes desconectados
     def remove_offline(self):
