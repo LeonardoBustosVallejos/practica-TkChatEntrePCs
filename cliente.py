@@ -1,4 +1,5 @@
 import socket
+import threading
 import tkinter as tk
 from threading import Thread
 import tkinter.messagebox as messagebox
@@ -113,6 +114,8 @@ class ClientGUI:
         self.connect_to_server()
         # Considera si es la primera fila de botones
         self.first_row = True 
+        # Lista de clientes inactivos
+        self.innactive_clients = [] 
 # ===================================================================================================
 
 # ===================================== FUNCIONES UTILITARIAS =======================================
@@ -172,12 +175,16 @@ class ClientGUI:
                 self.receive_thread = Thread(target=self.receive_messages)
                 self.receive_thread.start()
 
+                # Inicia el temporizador de inactividad
+                self.inactivity_timer = threading.Timer(10, self.send_warning)
+                self.inactivity_timer.start()
+
                 self.log('Conectado al servidor')
                 self.connect_button.config(state=tk.DISABLED)
                 self.disconnect_button.config(state=tk.NORMAL)
                 self.global_button.config(state=tk.NORMAL)
                 self.remove_offline_button.config(state=tk.NORMAL)
-                # Change the background color of the server button to green
+                # Cambiar el color del botón del servidor a verde
                 self.client_buttons['Servidor'].config(bg='green')
                 self.messages_to_text.config(state=tk.NORMAL)
                 self.message_text.config(state=tk.NORMAL)
@@ -187,7 +194,6 @@ class ClientGUI:
 
             except Exception as e:
                 print(e) # Linea de excepción
-
                 # Configurar la variable de conexión
                 self.connected = False
 
@@ -197,6 +203,20 @@ class ClientGUI:
                 if retries == max_retries:
                     self.log('No se pudo conectar al servidor después de varios intentos')
                     break
+
+    # Enviar una advertencia al servidor si el cliente está inactivo
+    def send_warning(self):
+        if self.connected:
+            print('Sending warning')
+            self.socket.sendall(f'ADVERTENCIA: {self.name.get()} ESTA INACTIVO'.encode('utf-8'))
+            self.inactivity_timer = threading.Timer(60, self.send_warning)
+            self.inactivity_timer.start()
+
+    def reset_timer(self):
+        if self.inactivity_timer is not None:
+            self.inactivity_timer.cancel()
+        self.inactivity_timer = threading.Timer(60, self.send_warning)
+        self.inactivity_timer.start()
 
     # Función para manejar la desconexión del servidor
     def handle_server_disconnection(self):
@@ -237,6 +257,37 @@ class ClientGUI:
             self.messages_to_text.config(state=tk.DISABLED)
             self.message_text.config(state=tk.DISABLED)
             self.send_button.config(state=tk.DISABLED)
+
+    def verify_inactive_clients(self, client):
+        if client not in self.innactive_clients:
+            self.innactive_clients.append(client)
+        try:
+            self.update_buttons_colors(client, 'inactive')
+        except Exception as e:
+            print(f'Exception occurred: {e}')
+
+    def handle_reactived_clients(self, data):
+        print(f'Data: {data}')  # Debug line
+        parts = data.split(':')
+        print(f'Parts: {parts}')  # Debug line
+        client = ''  # Initialize client
+        if len(parts) > 1:
+            client = parts[1].strip().split(' ')[1]
+            if client in self.innactive_clients:
+                self.innactive_clients.remove(client)
+                self.update_buttons_colors(client, 'connected')
+                print(f'Cliente {client} reactivado')
+                if client == self.name.get():
+                    self.log('Sistema: YA NO ESTAS INACTIVO')
+                else:
+                    self.log(f'EL CLIENTE {client} YA NO ESTA INACTIVO')
+        print(f'Self.innactive_clients: {self.innactive_clients}\nSelf.connected_clients: {self.connected_clients}\nClient: {client}')
+
+
+        #if client == self.name.get():
+        #    self.log('TE HAZ REACTIVADO')
+        #elif self.innactive_clients is not None and client in self.connected_clients:
+        #    self.log(f'EL CLIENTE {client} YA NO ESTA INACTIVO')
 # ===================================================================================================
 
 # ==================================== FUNCIONES DE CLIENTES ========================================
@@ -342,12 +393,21 @@ class ClientGUI:
             elif status == 'disconnected': # Si el estado es desconectado
                 self.client_buttons[client_name]['state'] = 'disabled' # Deshabilita el botón
                 self.client_buttons[client_name]['bg'] = 'red' # Cambia el color del botón a rojo
+            elif status == 'inactive': # Si el estado es inactivo
+                self.client_buttons[client_name]['state'] = 'normal' # Habilita el botón
+                self.client_buttons[client_name]['bg'] = 'yellow' # Cambia el color del botón a amarillo
+
+    def reactivate_client(self, client):
+        if client in self.innactive_clients:
+            self.innactive_clients.remove(client)
+        self.update_buttons_colors(client, 'connected')
 
 # ===================================================================================================
 # ====================================== MENSAJES ===================================================
     def send_message(self): # Función para enviar un mensaje
         message = self.message_text.get('1.0', tk.END).strip() # Obtiene el mensaje del text box
         self.enable_log()
+        self.reset_timer() # Reinicia el temporizador de inactividad
 
         # Verifica si hay conexión con el servidor
         if not self.connected:
@@ -385,6 +445,16 @@ class ClientGUI:
         while self.connected: # Mientras este conectado
             try:
                 data = self.socket.recv(1024).decode('utf-8') # Recibe datos del servidor
+                
+                # If the data starts with 'WARNING-', handle it separately
+                if data.startswith('WARNING-'):
+                    client = data.split('-')[1]
+                    if client == self.name.get():
+                        self.log(f'INACTIVE {client} DETECTED, SEND A MESSAGE')
+                    else:
+                        print(f'INACTIVE {client} DETECTED')
+                    continue
+
                 self.handle_received_data(data) # Maneja los datos recibidos
             except Exception as e:
                 print(e) # Linea de excepción
@@ -402,6 +472,10 @@ class ClientGUI:
             self.server_broken() # Maneja la caída del servidor
         elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
             self.update_sent_messages(data) # Actualiza los mensajes enviados
+        elif data.startswith('Sistema: ADVERTENCIA:'): # Si los datos empiezan con 'MESSAGE'
+            self.handle_inactive_clients(data) # Agrega los datos a la caja de texto de log
+        elif data.startswith('Sistema: Cliente'): # Si los datos empiezan con 'MESSAGE'   
+            self.handle_reactived_clients(data) # Agrega los datos a la caja de texto de log
         else: # En cualquier otro caso
             self.log(data) # Agrega los datos a la caja de texto de log
 
@@ -415,6 +489,22 @@ class ClientGUI:
     # Función para actualizar los mensajes enviados
     def update_sent_messages(self, response):
         self.log('end', response + '\n') # Agrega los mensajes enviados a la caja de texto de log
+
+    def handle_inactive_clients(self, data):
+        parts = data.split(':')
+        if len(parts) > 2:
+            client = parts[2].strip().split(' ')[0]  # Get the client's name
+            if client == self.name.get():  
+                if client in self.innactive_clients:
+                    self.log('ADVERTENCIA: SIGUES ESTANDO INACTIVO')
+                else:
+                    self.log('ADVERTENCIA: ESTAS INACTIVO') 
+            else:
+                self.log(f"EL CLIENTE {client} ESTA INACTIVO")
+        else:
+            self.log("El mensaje no esta en el formato correcto")
+
+        self.verify_inactive_clients(client)
 # ====================================================================================================
 
 if __name__ == "__main__":

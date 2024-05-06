@@ -112,7 +112,10 @@ class ServerGUI:
         }
         # clientes seleccionados para enviar mensajes
         self.selected_clients = []
+        # Destinatarios
         self.recipients = ''
+        # Lista de clientes inactivos
+        self.inactive_clients = [] 
 # =================================================================================================
 
 # ===================================== FUNCIONES UTILITARIAS =====================================
@@ -203,7 +206,7 @@ class ServerGUI:
             self.server_running = False # El server ya no esta corriendo
             self.send_system_message('SERVIDOR CAIDO...')
 
-            time.sleep(0.3)  # Espera un segundo para que los mensajes se envíen antes de cerrar las conexiones
+            time.sleep(1)  # Espera un segundo para que los mensajes se envíen antes de cerrar las conexiones
 
             for conn_dict in self.connections.values():
                 try:
@@ -230,7 +233,7 @@ class ServerGUI:
         # Cierra la ventana si se presiono el boton de cerrar
         if close_gui:
             self.master.destroy()
-# =================================================================================================
+# ===================================================================================================
 
 # ==================================== FUNCIONES DE LOS CLIENTES ====================================
     # ======================= SELECCIONAR CLIENTE =======================
@@ -308,18 +311,45 @@ class ServerGUI:
     def process_messages(self, client_socket, client_name):
         while self.server_running:  # Solo procesa mensajes si el servidor esta corriendo
             try:
-                message = self.receive_message(client_socket)# Recibe el mensaje del cliente
-                if message == 'DISCONNECT': # Si el mensaje es 'DISCONNECT'
-                    self.client_buttons[client_name].config(bg='red' )# Cambia el color del botón a rojo
+                message = self.receive_message(client_socket)  # Recibe el mensaje del cliente
+                if message == 'DISCONNECT':  # Si el mensaje es 'DISCONNECT'
+                    self.client_buttons[client_name].config(bg='red')  # Cambia el color del botón a rojo
                     break
-                if message != '':# Si el mensaje no esta vacio
-                    sender, clients_to, message_text = self.parse_message(message)# Parsea el mensaje
-                    self.handle_parsed_message(sender, clients_to, message_text)# Maneja el mensaje parseado
+                if message.startswith('ADVERTENCIA: '):
+                    self.handle_parsed_message('Servidor', ['Global'], message)
+                elif message != '':  # Si el mensaje no esta vacio
+                    sender, clients_to, message_text = self.parse_message(message)  # Parsea el mensaje
+                    self.handle_parsed_message(sender, clients_to, message_text)  # Maneja el mensaje parseado
+
+                    if client_name in self.inactive_clients:  # Si el cliente esta en la lista de clientes inactivos
+                        self.handle_reactived_client(client_name)  # Maneja el cliente inactivo
+
             # Maneja las excepciones
-            except ConnectionAbortedError: # Si la conexión fue abortada
-                print(f'Connection with {client_name} was aborted.') # Linea de error
-            except Exception as e: # Si hay un error
-                print(f'Error processing messages from {client_name}: {e}') # Linea de error
+            except ConnectionAbortedError:  # Si la conexión fue abortada
+                print(f'Connection with {client_name} was aborted.')  # Linea de error
+            except Exception as e:  # Si hay un error
+                print(f'Error processing messages from {client_name}: {e}')  # Linea de error
+
+    def handle_inactive_client(self, client, message_text):
+        # Si el cliente no esta en la lista de clientes inactivos
+        if client not in self.inactive_clients: 
+            self.inactive_clients.append(client)
+            # Cambia el color del botón a amarillo
+            self.client_buttons[client].config(bg='yellow')
+            # Muestra el mensaje en la ventana de log
+            self.log(f"{message_text}") 
+        else:
+            # Muestra el mensaje en la ventana de log
+            self.log(f'ADVERTENCIA: EL CLIENTE {client} SIGUE INACTIVO')
+        # Muestra el mensaje en la ventana de log
+        self.send_system_message(f'ADVERTENCIA: {client} ESTA INACTIVO')
+
+    def handle_reactived_client(self, client):
+        if client in self.inactive_clients:
+            self.inactive_clients.remove(client)
+            self.client_buttons[client].config(bg='green')  # Cambia el color del botón a verde
+            self.send_system_message(f'Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
+            self.log(f'Sitema: Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
     # =================================================================================================
 
     # ======================= BOTONES =======================
@@ -377,7 +407,7 @@ class ServerGUI:
 
     # =================================================================================================
 
-# ===================================== MEENSAJES =====================================================
+# ===================================== MENSAJES ======================================================
     def send_message(self, sender, clients_to, message=None):
         # Si no se es provisto un aargumento de mensaje, obtener el mensaje del campo de texto
         if message is None:
@@ -423,6 +453,17 @@ class ServerGUI:
 
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
+
+        # If the message starts with 'ADVERTENCIA:', handle it separately
+        if message_text.startswith('ADVERTENCIA:'):
+            parts = message_text.split(' ')
+            if len(parts) > 2:
+                client = parts[1]
+                self.handle_inactive_client(client, message_text)
+            else:
+                print("Warning message is not formatted correctly.")
+            return
+
         clients_to_copy = clients_to.copy()  # Crea una copia de clients_to
 
         # Si 'Servidor' esta en la lista de clientes a los que se envio el mensaje
@@ -439,9 +480,8 @@ class ServerGUI:
             if sender != 'Servidor':  # Si el remitente no es el servidor
                 self.log(f'{sender} (Privado) a {recipients}: {message_text}')  # Muestra el mensaje en la ventana de log
             # Asigna la copia de clients_to a la lista de clientes seleccionados
-            # Con el fin dee evitar que 'Servidor' esté dentro de los seleccionados
+            # Con el fin de evitar que 'Servidor' esté dentro de los seleccionados
             self.selected_clients = clients_to_copy
-
 
     # Mensaje global
     def send_global_message(self, sender, message):
