@@ -481,8 +481,10 @@ class ClientGUI:
 
     # Función para manejar los mensajes ocultos
     def handle_hidden_message(self, hidden_message):
+        print(f'Hidden message: {hidden_message}') # Linea de debug
         client_status_pairs = hidden_message.split(',') # Divide los mensajes ocultos en pares de cliente y estado
         connected_clients = self.get_connected_clients(client_status_pairs) # Obtiene los clientes conectados
+        print(f'Connected clients: {connected_clients}') # Linea de debug
         self.update_disconnected_clients(connected_clients) # Actualiza los clientes desconectados
         self.connected_clients = connected_clients # Actualiza la lista de clientes conectados
 

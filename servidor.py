@@ -268,7 +268,7 @@ class ServerGUI:
 # ======================================= CONEXIONES ===============================================
     # Manejar la conexión con un cliente
     def handle_connection(self, client_socket, client_address, client_name):
-        # ñadir el cliente a la lista de conexiones
+        # añadir el cliente a la lista de conexiones
         self.connections[client_name] = {'connection': client_socket, 'connected': True}
         # Imprime el estado de todos los clientes
         self.print_client_status()
@@ -282,8 +282,23 @@ class ServerGUI:
         self.send_system_message(f'Cliente {client_name} se ha conectado') # Muestra el mensaje en la ventana de log
         self.log(f'Cliente {client_name} se ha conectado.')
         self.global_button.config(state='normal')  # Habilita el botón global
+        print(f'Clientes desconectados: {client_name in self.inactive_clients}')
         if client_name in self.client_buttons:
-            self.update_buttons_green(client_name)
+            print(f'Client {client_name} is in the client buttons')
+        else:
+            self.update_client_buttons(client_name)  # Create a new button for the new client
+
+        for client in self.connections.keys():
+            if client not in self.inactive_clients:
+                self.update_buttons_green(client)
+                print(f"Client {client} is active.")
+            else:
+                self.update_buttons_yellow(client)
+                print(f"Client {client} is inactive.")
+
+        print(f'Client {client_name} is connected')  # Linea de error
+        print(f'self.connections.keys(): {self.connections.keys()}')
+        print(f'self.inactive_clients: {self.inactive_clients}')
 
     # Terminar la conexión con el cliente
     def terminate_connection(self, client_socket, client_name):
@@ -334,6 +349,7 @@ class ServerGUI:
         # Si el cliente no esta en la lista de clientes inactivos
         if client not in self.inactive_clients: 
             self.inactive_clients.append(client)
+            print(f'Client {client} has been add to inactive')  # Linea de error
             # Cambia el color del botón a amarillo
             self.update_buttons_yellow(client)
             # Muestra el mensaje en la ventana de log
@@ -347,6 +363,7 @@ class ServerGUI:
     def handle_reactived_client(self, client):
         if client in self.inactive_clients:
             self.inactive_clients.remove(client)
+            print(f'Client {client} has been removed from inactive')  # Linea de error
             self.update_buttons_green(client)
             self.send_system_message(f'Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
             self.log(f'Sitema: Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
@@ -354,19 +371,16 @@ class ServerGUI:
 
     # ======================= BOTONES =======================
     def update_buttons_green(self, client_name):
-        for client_name in self.connections.keys():
-            if client_name in self.client_buttons:
-                self.client_buttons[client_name].config(bg='green')
-    
+        if client_name in self.client_buttons:
+            self.client_buttons[client_name].config(bg='green')
+
     def update_buttons_yellow(self, client_name):
-        for client_name in self.inactive_clients:
-            if client_name in self.client_buttons:
-                self.client_buttons[client_name].config(bg='yellow')
-    
+        if client_name in self.client_buttons:
+            self.client_buttons[client_name].config(bg='yellow')
+
     def update_buttons_red(self, client_name):
-        for client_name in self.connections.keys():
-            if client_name in self.client_buttons:
-                self.client_buttons[client_name].config(bg='red')
+        if client_name in self.client_buttons:
+            self.client_buttons[client_name].config(bg='red')
 
     # Crear un botón para un cliente
     def create_button(self, client_name):
@@ -553,8 +567,13 @@ class ServerGUI:
             if client_info['connected']:# Si el cliente esta conectado
                 try:
                     client_info['connection'].sendall(('HIDDEN:' + message).encode())# Envia el mensaje al cliente + el mensaje oculto
+                    print(f'Sent hidden message to {message}')# Muestra el mensaje en la ventana de log
+
                 except Exception as e:
                     self.log(f'Error sending hidden message to {client_name}: {e}')
+
+            if self.inactive_clients and client_name in self.inactive_clients:
+                self.log('Ya hay un cliente inactivo')# Muestra el mensaje en la ventana de log
 
     # Enviar un mensaje a todos los clientes como el sistema
     def send_system_message(self, message, exclude_client=None):
