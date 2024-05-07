@@ -90,8 +90,8 @@ class ClientGUI:
         self.client_buttons = {'Servidor': self.server_button}
 
         # Boton "Eliminar desconectados"
-        self.remove_offline_button = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
-        self.remove_offline_button.place(x=510, y=280)
+        self.remove_offline_btn = tk.Button(master, text='Eliminar\ndesconectados', command=self.remove_offline_button)
+        self.remove_offline_btn.place(x=510, y=280)
 
         # Destinatarios
         self.messages_to_label = tk.Label(master, text='Dirigido a:')
@@ -122,9 +122,11 @@ class ClientGUI:
     # Habilitar la caja de texto de log
     def enable_log(self):
         self.log_text.config(state='normal')
+
     # Deshabilitar la caja de texto de log
     def disable_log(self):
         self.log_text.config(state='disabled')
+
     # Agregar un mensaje a la caja de texto de log
     def log(self, message):
         self.enable_log()
@@ -150,6 +152,59 @@ class ClientGUI:
         self.messages_to_text.delete('1.0', tk.END)
         self.messages_to_text.insert(tk.END, ', '.join(self.selected_clients)) # Agregar los clientes seleccionados, separados por coma
         self.messages_to_text.config(state='disabled')
+
+    def update_labels_normal(self):
+        self.name_entry.config(bg='#f0f0f0')
+        self.name_label.config(bg='#f0f0f0')
+
+    def update_labels_warning(self):
+        self.name_entry.config(bg='yellow')
+        self.name_label.config(bg='yellow')
+    
+    def update_labels_error(self):
+        self.name_entry.config(bg='red')
+        self.name_label.config(bg='red')
+
+    def update_buttons_connected(self):
+        self.connect_button.config(state=tk.DISABLED)
+        self.disconnect_button.config(state=tk.NORMAL)
+        self.global_button.config(state=tk.NORMAL)
+        self.remove_offline_btn.config(state=tk.NORMAL)
+        # Cambiar el color del botón del servidor a verde
+        self.client_buttons['Servidor'].config(bg='green')
+        self.messages_to_text.config(state=tk.NORMAL)
+        self.message_text.config(state=tk.NORMAL)
+        self.send_button.config(state=tk.NORMAL)
+    
+    def update_buttons_disconnected(self):
+            self.connect_button.config(state=tk.NORMAL)
+            self.disconnect_button.config(state=tk.DISABLED)
+            self.global_button.config(state=tk.DISABLED)
+            self.remove_offline_btn.config(state=tk.DISABLED)
+            # Schedule the GUI update to run in the main thread
+            self.master.after(0, self.update_server_button_color)
+            self.messages_to_text.config(state=tk.DISABLED)
+            self.message_text.config(state=tk.DISABLED)
+            self.send_button.config(state=tk.DISABLED)
+
+        # Función para manejar los datos recibidos
+    def handle_received_data(self, data):
+        if not data: # Si no hay datos
+            self.handle_server_disconnection() # Maneja la desconexión del servidor
+        elif data.startswith('HIDDEN:'): # Si los datos empiezan con 'HIDDEN:'
+            self.handle_hidden_message(data[7:]) # Maneja los mensajes ocultos
+        elif data.startswith('INACTIVES:'): # Si los datos empiezan con 'INACTIVES:'
+            self.handle_inctive_clients_from_server(data[10:]) # Maneja los clientes inactivos
+        elif data == 'Sistema: SERVIDOR CAIDO...': # Si los datos son 'Sistema: SERVIDOR CAIDO...'
+            self.server_broken() # Maneja la caída del servidor
+        elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
+            self.update_sent_messages(data) # Actualiza los mensajes enviados
+        elif data.startswith('Sistema: ADVERTENCIA:'): # Si los datos empiezan con 'MESSAGE'
+            self.handle_inactive_clients(data) # Agrega los datos a la caja de texto de log
+        elif data.startswith('Sistema: Cliente'): # Si los datos empiezan con 'MESSAGE'   
+            self.handle_reactived_clients(data) # Agrega los datos a la caja de texto de log
+        else: # En cualquier otro caso
+            self.log(data) # Agrega los datos a la caja de texto de log
 # ===================================================================================================
 
 # ======================================= FUNCIONES DE CONEXIÓN =====================================
@@ -157,6 +212,8 @@ class ClientGUI:
     def connect_to_server(self):
         max_retries = 3
         retries = 0
+
+        self. update_labels_normal()
         while True:
             try:
                 # Crear un objeto de socket TCP
@@ -180,15 +237,9 @@ class ClientGUI:
                 self.inactivity_timer.start()
 
                 self.log('Conectado al servidor')
-                self.connect_button.config(state=tk.DISABLED)
-                self.disconnect_button.config(state=tk.NORMAL)
-                self.global_button.config(state=tk.NORMAL)
-                self.remove_offline_button.config(state=tk.NORMAL)
-                # Cambiar el color del botón del servidor a verde
-                self.client_buttons['Servidor'].config(bg='green')
-                self.messages_to_text.config(state=tk.NORMAL)
-                self.message_text.config(state=tk.NORMAL)
-                self.send_button.config(state=tk.NORMAL)
+
+                # Actualizar los botones
+                self.update_buttons_connected()
                 
                 break  # Si se conectó, salir del bucle
 
@@ -200,14 +251,16 @@ class ClientGUI:
                 # Esperar 5 segundos antes de intentar reconectar
                 time.sleep(5)
                 retries += 1
-                if retries == max_retries:
-                    self.log('No se pudo conectar al servidor después de varios intentos')
+                if retries == max_retries: # Si se intentó reconectar 3 veces
+                    self.log('No se pudo conectar al servidor después de varios intentos') # Avísale al usuario
                     break
 
     # Enviar una advertencia al servidor si el cliente está inactivo
     def send_warning(self):
+        
+        self.update_labels_warning()
+
         if self.connected:
-            print('Sending warning')
             self.socket.sendall(f'ADVERTENCIA: {self.name.get()} ESTA INACTIVO'.encode('utf-8'))
             self.inactivity_timer = threading.Timer(60, self.send_warning)
             self.inactivity_timer.start()
@@ -235,6 +288,11 @@ class ClientGUI:
 
     # Función para desconectarse del servidor
     def disconnect_from_server(self):
+
+        self.update_labels_error()
+
+        if self.name.get() in self.innactive_clients:
+            self.innactive_clients.remove(self.name.get())
         try:
             # Enviar mensaje de desconexión al servidor
             if self.connected:
@@ -248,15 +306,9 @@ class ClientGUI:
         finally:
             self.connected = False
             self.log('Desconectado del servidor')
-            self.connect_button.config(state=tk.NORMAL)
-            self.disconnect_button.config(state=tk.DISABLED)
-            self.global_button.config(state=tk.DISABLED)
-            self.remove_offline_button.config(state=tk.DISABLED)
-            # Schedule the GUI update to run in the main thread
-            self.master.after(0, self.update_server_button_color)
-            self.messages_to_text.config(state=tk.DISABLED)
-            self.message_text.config(state=tk.DISABLED)
-            self.send_button.config(state=tk.DISABLED)
+
+            # Actualizar los botones
+            self.update_buttons_disconnected()
 
     def verify_inactive_clients(self, client):
         if client not in self.innactive_clients:
@@ -267,22 +319,17 @@ class ClientGUI:
             print(f'Exception occurred: {e}')
 
     def handle_reactived_clients(self, data):
-        print(f'Data: {data}')  # Debug line
         parts = data.split(':')
-        print(f'Parts: {parts}')  # Debug line
-        client = ''  # Initialize client
+        client = ''  # Inicializa la variable del cliente
         if len(parts) > 1:
             client = parts[1].strip().split(' ')[1]
-            print(f'Client: {client}')  # Debug line
             if client in self.innactive_clients:
                 self.innactive_clients.remove(client)
                 self.update_buttons_colors(client, 'connected')
-                print(f'Cliente {client} reactivado')
                 if client == self.name.get():
                     self.log('Sistema: YA NO ESTAS INACTIVO')
                 else:
                     self.log(f'EL CLIENTE {client} YA NO ESTA INACTIVO')
-        print(f'Self.innactive_clients: {self.innactive_clients}\nSelf.connected_clients: {self.connected_clients}\nClient: {client}')
 
 # ===================================================================================================
 
@@ -400,29 +447,12 @@ class ClientGUI:
 
 # ===================================================================================================
 # ====================================== MENSAJES ===================================================
-    # Función para manejar los datos recibidos
-    def handle_received_data(self, data):
-        if not data: # Si no hay datos
-            self.handle_server_disconnection() # Maneja la desconexión del servidor
-        elif data.startswith('HIDDEN:'): # Si los datos empiezan con 'HIDDEN:'
-            self.handle_hidden_message(data[7:]) # Maneja los mensajes ocultos
-        elif data.startswith('INACTIVES:'): # Si los datos empiezan con 'INACTIVES:'
-            self.handle_inctive_clients_from_server(data[10:]) # Maneja los clientes inactivos
-        elif data == 'Sistema: SERVIDOR CAIDO...': # Si los datos son 'Sistema: SERVIDOR CAIDO...'
-            self.server_broken() # Maneja la caída del servidor
-        elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
-            self.update_sent_messages(data) # Actualiza los mensajes enviados
-        elif data.startswith('Sistema: ADVERTENCIA:'): # Si los datos empiezan con 'MESSAGE'
-            self.handle_inactive_clients(data) # Agrega los datos a la caja de texto de log
-        elif data.startswith('Sistema: Cliente'): # Si los datos empiezan con 'MESSAGE'   
-            self.handle_reactived_clients(data) # Agrega los datos a la caja de texto de log
-        else: # En cualquier otro caso
-            self.log(data) # Agrega los datos a la caja de texto de log
 
     def send_message(self): # Función para enviar un mensaje
         message = self.message_text.get('1.0', tk.END).strip() # Obtiene el mensaje del text box
         self.enable_log()
         self.reset_timer() # Reinicia el temporizador de inactividad
+        self.update_labels_normal() # Actualiza los labels a su color normal
 
         # Verifica si hay conexión con el servidor
         if not self.connected:
@@ -460,16 +490,6 @@ class ClientGUI:
         while self.connected: # Mientras este conectado
             try:
                 data = self.socket.recv(1024).decode('utf-8') # Recibe datos del servidor
-                
-                # If the data starts with 'WARNING-', handle it separately
-                if data.startswith('WARNING-'):
-                    client = data.split('-')[1]
-                    if client == self.name.get():
-                        self.log(f'INACTIVE {client} DETECTED, SEND A MESSAGE')
-                    else:
-                        print(f'INACTIVE {client} DETECTED')
-                    continue
-
                 self.handle_received_data(data) # Maneja los datos recibidos
             except Exception as e:
                 print(e) # Linea de excepción
@@ -479,10 +499,8 @@ class ClientGUI:
 
     # Función para manejar los mensajes ocultos
     def handle_hidden_message(self, hidden_message):
-        print(f'Hidden message: {hidden_message}') # Linea de debug
         client_status_pairs = hidden_message.split(',') # Divide los mensajes ocultos en pares de cliente y estado
         connected_clients = self.get_connected_clients(client_status_pairs) # Obtiene los clientes conectados
-        print(f'Connected clients: {connected_clients}') # Linea de debug
         self.update_disconnected_clients(connected_clients) # Actualiza los clientes desconectados
         self.connected_clients = connected_clients # Actualiza la lista de clientes conectados
 
@@ -500,7 +518,7 @@ class ClientGUI:
     def handle_inactive_clients(self, data):
         parts = data.split(':')
         if len(parts) > 2:
-            client = parts[2].strip().split(' ')[0]  # Get the client's name
+            client = parts[2].strip().split(' ')[0]  # Obtiene el nombre del cliente
             if client == self.name.get():  
                 if client in self.innactive_clients:
                     self.log('ADVERTENCIA: SIGUES ESTANDO INACTIVO')

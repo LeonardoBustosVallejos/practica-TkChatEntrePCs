@@ -24,7 +24,8 @@ class ServerGUI:
 
         # Etiqueta de nombre del servidor
         self.name_label = tk.Label(master, textvariable=self.name)
-        self.name_label.place_configure(x=130, y = 15)
+        self.name_label.place_configure(x=133, y = 15)
+
         # Estado del servidor
         self.status_label = tk.Label(master, text='detenido')
         self.status_label.place_configure(x=180, y = 15) 
@@ -138,28 +139,51 @@ class ServerGUI:
     def log_recipient(self, recipient):
         if not recipient:
             recipient = 'Global'
-        elif isinstance(recipient, list):
-            recipient = ', '.join(recipient)
+        elif isinstance(recipient, list):# Si el destinatario es una lista
+            recipient = ', '.join(recipient)# Convierte la lista en una cadena de texto
         self.messages_to_text.config(state='normal')
         self.messages_to_text.delete('1.0', 'end')
         self.messages_to_text.insert('end', recipient)
         self.messages_to_text.config(state='disabled')
-# =================================================================================================
+    
+    def server_disconnected(self):
+        self.name_label.config(bg='red')
+        self.status_label.config(bg='red')
 
-# ==================================== FUNCIONES DEL SERVIDOR =====================================
-    # Iniciar la conexión con el servidor
-    def start_server(self):
-        # Inicia el server
-        self.server_running = True # Linea implementada para saber que el server esta corriendo
-        self.server_thread = threading.Thread(target=self.run_server)
-        self.server_thread.start()
-
+    def server_normal(self):
+        self.name_label.config(bg='#f0f0f0')
+        self.status_label.config(bg='#f0f0f0')
+    
+    # Habilita y deshabilita los botones cuando el servidor se inicia
+    def enable_buttons(self):
         self.start_button.config(state=tk.DISABLED)
         self.stop_button.config(state=tk.NORMAL)
         self.message_text.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
         self.remove_offline_button.config(state=tk.NORMAL)
 
+    # Habilita y deshabilita los botones cuando el servidor se detiene
+    def disable_buttons(self):
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            self.remove_offline_button.config(state=tk.DISABLED)
+            self.message_text.config(state=tk.DISABLED)
+            self.send_button.config(state=tk.DISABLED)
+            self.global_button.config(state=tk.DISABLED)
+# =================================================================================================
+# ==================================== FUNCIONES DEL SERVIDOR =====================================
+    # Iniciar la conexión con el servidor
+    def start_server(self):
+
+        self.server_normal()
+        self.enable_buttons() # Habilita los botones
+
+        # Inicia el server
+        self.server_running = True # Linea implementada para saber que el server esta corriendo
+        self.server_thread = threading.Thread(target=self.run_server)
+        self.server_thread.start()
+
+        # Muestra el estado del servidor en la ventana de status_label
         self.status_label.config(text='Iniciado')
 
         self.select_client('Global')# Selecciona el cliente global    
@@ -172,14 +196,13 @@ class ServerGUI:
 
         # Vincular el socket a una dirección y puerto específicos
         self.server_socket.bind((HOST, PORT))
-        self.enable_text
+
         self.log(f'Servidor iniciado en el puerto {PORT}')
 
         # Escuchar en el socket para conexiones entrantes
         self.server_socket.listen(1)
 
         self.connections = {}  
-        self.disable_text
 
         # Ciclo infinito para manejar conexiones entrantes
         while self.server_running:
@@ -201,6 +224,10 @@ class ServerGUI:
 
     # Detener la conexión con el servidor
     def stop_server(self, close_gui=False):
+
+        self.server_disconnected()
+        self.disable_buttons()
+
         if self.server_running:
             # Detiene el server
             self.server_running = False # El server ya no esta corriendo
@@ -220,155 +247,13 @@ class ServerGUI:
             except Exception as e:
                 print(f'Error closing socket: {e}') # Linea de error
 
-            # Habilita y deshabilita los botones
-            self.start_button.config(state=tk.NORMAL)
-            self.stop_button.config(state=tk.DISABLED)
-            self.remove_offline_button.config(state=tk.DISABLED)
-            self.message_text.config(state=tk.DISABLED)
-            self.send_button.config(state=tk.DISABLED)
-            self.global_button.config(state=tk.DISABLED)
-
-            self.status_label.config(text='detenido')
+            # Muestra el estado del servidor en la ventana de status_label
+            self.status_label.config(text='detenido') 
 
         # Cierra la ventana si se presiono el boton de cerrar
         if close_gui:
             self.master.destroy()
 # ===================================================================================================
-
-# ==================================== FUNCIONES DE LOS CLIENTES ====================================
-    # ======================= SELECCIONAR CLIENTE =======================
-    def select_client(self, client_name):
-        if client_name == 'Global':
-            self.selected_clients.clear()
-            self.selected_client = 'Global'
-            self.clients_to = ''
-        else:
-            # Si el cliente esta en la lista de clientes seleccionados, elimínalo
-            if client_name in self.selected_clients:
-                self.selected_clients.remove(client_name)
-            else:
-                # Si el cliente no esta en la lista de clientes seleccionados, añadelo
-                self.selected_clients.append(client_name)
-
-            # SSi no hay clientes seleccionados, selecciona el cliente global
-            if len(self.selected_clients) == 0:
-                self.selected_client = 'Global'
-            else:
-                # Si hay clientes seleccionados, selecciona el primer cliente de la lista
-                self.selected_client = self.selected_clients[0]
-
-        # Muestra los destinatarios en la ventana de messages_to_text
-        self.log_recipient(self.selected_clients)
-
-    # Elimina el cliente de la lista de clientes seleccionados
-    def remove_selected_client(self, client):
-        self.selected_clients.remove(client)
-# =================================================================================================
-
-# ======================================= CONEXIONES ===============================================
-    # Manejar la conexión con un cliente
-    def handle_connection(self, client_socket, client_address, client_name):
-        # añadir el cliente a la lista de conexiones
-        self.connections[client_name] = {'connection': client_socket, 'connected': True}
-        # Imprime el estado de todos los clientes
-        self.print_client_status()
-        self.initialize_connection(client_name)
-        self.process_messages(client_socket, client_name)
-        self.send_system_message(f'Cliente {client_name} se ha desconectado.')
-        self.terminate_connection(client_socket, client_name)
-
-    # Inicializar la conexión con el cliente
-    def initialize_connection(self, client_name):
-        self.send_system_message(f'Cliente {client_name} se ha conectado') # Muestra el mensaje en la ventana de log
-        self.log(f'Cliente {client_name} se ha conectado.')
-        self.global_button.config(state='normal')  # Habilita el botón global
-        print(f'Clientes desconectados: {client_name in self.inactive_clients}')
-        if client_name in self.client_buttons:
-            print(f'Client {client_name} is in the client buttons')
-        else:
-            self.update_client_buttons(client_name)  # Create a new button for the new client
-
-        for client in self.connections.keys():
-            if client not in self.inactive_clients:
-                self.update_buttons_green(client)
-                print(f"Client {client} is active.")
-            else:
-                self.update_buttons_yellow(client)
-                print(f"Client {client} is inactive.")
-
-        print(f'Client {client_name} is connected')  # Linea de error
-        print(f'self.connections.keys(): {self.connections.keys()}')
-        print(f'self.inactive_clients: {self.inactive_clients}')
-
-    # Terminar la conexión con el cliente
-    def terminate_connection(self, client_socket, client_name):
-        client_socket.close() # Cierra la conexion con el cliente
-        if client_name in self.connections:
-            del self.connections[client_name]# Elimina la conexion del cliente
-        self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
-        self.log(f"Conexion cerrada con {client_name}")# Muestra el mensaje en la ventana de log 
-        # Imprime el estado de todos los clientes
-        self.print_client_status()
-
-    # Desconectar un cliente
-    def handle_disconnected_client(self, client):
-        if client != 'Servidor':
-            # Set the connected status of the client to False
-            self.connections[client]['connected'] = False
-            # Imprime el estado de todos los clientes
-            self.print_client_status()  
-            self.log(f'{client} is not connected')
-            self.remove_selected_client(client) 
-            self.log_recipient(self.selected_clients)  # Muestra los destinatarios en la ventana de messages_to_text
-
-    # Procesar los mensajes del cliente
-    # Se relaciona tanto con mensajes como con la desconexión del cliente
-    def process_messages(self, client_socket, client_name):
-        while self.server_running:  # Solo procesa mensajes si el servidor esta corriendo
-            try:
-                message = self.receive_message(client_socket)  # Recibe el mensaje del cliente
-                if message == 'DISCONNECT':  # Si el mensaje es 'DISCONNECT'
-                    self.update_buttons_red(client_name)  # Cambia el color del botón a rojo
-                    break
-                if message.startswith('ADVERTENCIA: '):
-                    self.handle_parsed_message('Servidor', ['Global'], message)
-                elif message != '':  # Si el mensaje no esta vacio
-                    sender, clients_to, message_text = self.parse_message(message)  # Parsea el mensaje
-                    self.handle_parsed_message(sender, clients_to, message_text)  # Maneja el mensaje parseado
-
-                    if client_name in self.inactive_clients:  # Si el cliente esta en la lista de clientes inactivos
-                        self.handle_reactived_client(client_name)  # Maneja el cliente inactivo
-
-            # Maneja las excepciones
-            except ConnectionAbortedError:  # Si la conexión fue abortada
-                print(f'Connection with {client_name} was aborted.')  # Linea de error
-            except Exception as e:  # Si hay un error
-                print(f'Error processing messages from {client_name}: {e}')  # Linea de error
-
-    def handle_inactive_client(self, client, message_text):
-        # Si el cliente no esta en la lista de clientes inactivos
-        if client not in self.inactive_clients: 
-            self.inactive_clients.append(client)
-            print(f'Client {client} has been add to inactive')  # Linea de error
-            # Cambia el color del botón a amarillo
-            self.update_buttons_yellow(client)
-            # Muestra el mensaje en la ventana de log
-            self.log(f"{message_text}") 
-        else:
-            # Muestra el mensaje en la ventana de log
-            self.log(f'ADVERTENCIA: EL CLIENTE {client} SIGUE INACTIVO')
-        # Muestra el mensaje en la ventana de log
-        self.send_system_message(f'ADVERTENCIA: {client} ESTA INACTIVO')
-
-    def handle_reactived_client(self, client):
-        if client in self.inactive_clients:
-            self.inactive_clients.remove(client)
-            print(f'Client {client} has been removed from inactive')  # Linea de error
-            self.update_buttons_green(client)
-            self.send_system_message(f'Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
-            self.log(f'Sitema: Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
-    # =================================================================================================
-
     # ======================= BOTONES =======================
     def update_buttons_green(self, client_name):
         if client_name in self.client_buttons:
@@ -393,12 +278,9 @@ class ServerGUI:
     def update_client_buttons(self):
         # actualiza los clientes conectados
         for name in self.connections.keys():
-            self.add_client_button_if_not_exists(name)
-
-    def add_client_button_if_not_exists(self, name):
-        if name not in self.client_buttons:
-            # Crea un boton para el cliente
-            self.add_client_button(name)
+            if name not in self.client_buttons:
+                # Crea un boton para el cliente
+                self.add_client_button(name)
 
     # Añadir un botón para un cliente
     def add_client_button(self, client_name):
@@ -435,7 +317,137 @@ class ServerGUI:
                 del self.client_buttons[name]# Remueve el botón de la lista de botones
 
     # =================================================================================================
+# ======================================= CONEXIONES ===============================================
+    # Manejar la conexión con un cliente
+    def handle_connection(self, client_socket, client_address, client_name):
+        # añadir el cliente a la lista de conexiones
+        self.connections[client_name] = {'connection': client_socket, 'connected': True}
+        # Imprime el estado de todos los clientes
+        self.print_client_status()
+        self.initialize_connection(client_name)
+        self.process_messages(client_socket, client_name)
+        self.send_system_message(f'Cliente {client_name} se ha desconectado.')
+        self.terminate_connection(client_socket, client_name)
 
+    # Inicializar la conexión con el cliente
+    def initialize_connection(self, client_name):
+        self.send_system_message(f'Cliente {client_name} se ha conectado') # Muestra el mensaje en la ventana de log
+        self.log(f'Cliente {client_name} se ha conectado.') # Muestra el mensaje en la ventana de log
+        self.global_button.config(state='normal')  # Habilita el botón global cuando un cliente se conecta
+
+        if client_name in self.client_buttons:
+            print(f'Client {client_name} is in the client buttons') # Linea de error
+        else:
+            self.update_client_buttons(client_name)  # Actualiza el menu de conectados
+
+        for client in self.connections.keys(): # Para cada cliente en la lista de conexiones
+            if client not in self.inactive_clients: # Si el cliente no esta en la lista de clientes inactivos
+                self.update_buttons_green(client) # Cambia el color del botón a verde
+            else:
+                self.update_buttons_yellow(client) # Cambia el color del botón a amarillo
+
+    # Terminar la conexión con el cliente
+    def terminate_connection(self, client_socket, client_name):
+        client_socket.close() # Cierra la conexion con el cliente
+        if client_name in self.connections:
+            del self.connections[client_name]# Elimina la conexion del cliente
+        self.master.after(0, self.update_client_buttons)  # Actualiza el menu de conectados
+        self.log(f"Conexion cerrada con {client_name}")# Muestra el mensaje en la ventana de log 
+        # Imprime el estado de todos los clientes
+        self.print_client_status()
+
+    # Desconectar un cliente
+    def handle_disconnected_client(self, client):
+        if client != 'Servidor':
+            # El cliente pasa a estar desconectado
+            self.connections[client]['connected'] = False 
+            # Imprime el estado de todos los clientes
+            self.print_client_status()
+            self.remove_selected_client(client) 
+            self.log_recipient(self.selected_clients)  # Muestra los destinatarios en la ventana de messages_to_text
+
+    # Procesar los mensajes del cliente
+    # Se relaciona tanto con mensajes como con la desconexión del cliente
+    def process_messages(self, client_socket, client_name):
+        while self.server_running:  # Solo procesa mensajes si el servidor esta corriendo
+            try:
+                message = self.receive_message(client_socket)  # Recibe el mensaje del cliente
+                if message == 'DISCONNECT':  # Si el mensaje es 'DISCONNECT'
+                    self.update_buttons_red(client_name)  # Cambia el color del botón a rojo
+
+                    # Elimina el cliente de la lista de clientes inactivos
+                    if client_name in self.inactive_clients:
+                        self.inactive_clients.remove(client_name)  
+                    break
+
+                if message.startswith('ADVERTENCIA: '):
+                    self.handle_parsed_message('Servidor', ['Global'], message)
+                elif message != '':  # Si el mensaje no esta vacio
+                    sender, clients_to, message_text = self.parse_message(message)  # Parsea el mensaje
+                    self.handle_parsed_message(sender, clients_to, message_text)  # Maneja el mensaje parseado
+
+                    if client_name in self.inactive_clients:  # Si el cliente esta en la lista de clientes inactivos
+                        self.handle_reactived_client(client_name)  # Maneja el cliente inactivo
+
+            # Maneja las excepciones
+            except ConnectionAbortedError:  # Si la conexión fue abortada
+                print(f'Connection with {client_name} was aborted.')  # Linea de error
+            except Exception as e:  # Si hay un error
+                print(f'Error processing messages from {client_name}: {e}')  # Linea de error
+
+    def handle_inactive_client(self, client, message_text):
+        # Si el cliente no esta en la lista de clientes inactivos
+        if client not in self.inactive_clients: 
+            self.inactive_clients.append(client)
+            # Cambia el color del botón a amarillo
+            self.update_buttons_yellow(client)
+            # Muestra el mensaje en la ventana de log
+            self.log(f"{message_text}") 
+        else:
+            # Muestra el mensaje en la ventana de log
+            self.log(f'ADVERTENCIA: EL CLIENTE {client} SIGUE INACTIVO')
+        # Muestra el mensaje en la ventana de log
+        self.send_system_message(f'ADVERTENCIA: {client} ESTA INACTIVO')
+
+    def handle_reactived_client(self, client):
+        if client in self.inactive_clients:
+            self.inactive_clients.remove(client)
+            self.update_buttons_green(client)
+            self.send_system_message(f'Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
+            self.log(f'Sitema: Cliente {client} ha vuelto a estar activo.')  # Muestra el mensaje en la ventana de log
+    # =================================================================================================
+# =====================================================================================================
+
+# ==================================== FUNCIONES DE LOS CLIENTES ======================================
+    # ======================= SELECCIONAR CLIENTE =======================
+    def select_client(self, client_name):
+
+        if client_name == 'Global': # Si el cliente seleccionado es global
+            self.selected_clients.clear() # Limpia la lista de clientes seleccionados
+            self.selected_client = 'Global' # Selecciona el cliente global
+            self.clients_to = '' # Asigna los clientes a los que se envio el mensaje a una cadena de texto vacia
+        else:
+            # Si el cliente esta en la lista de clientes seleccionados, elimínalo
+            if client_name in self.selected_clients:
+                self.selected_clients.remove(client_name)
+            else:
+                # Si el cliente no esta en la lista de clientes seleccionados, añadelo
+                self.selected_clients.append(client_name)
+
+            # SSi no hay clientes seleccionados, selecciona el cliente global
+            if len(self.selected_clients) == 0:
+                self.selected_client = 'Global'
+            else:
+                # Si hay clientes seleccionados, selecciona el primer cliente de la lista
+                self.selected_client = self.selected_clients[0]
+
+        # Muestra los destinatarios en la ventana de messages_to_text
+        self.log_recipient(self.selected_clients)
+
+    # Elimina el cliente de la lista de clientes seleccionados
+    def remove_selected_client(self, client):
+        self.selected_clients.remove(client)
+# =================================================================================================
 # ===================================== MENSAJES ======================================================
     def send_message(self, sender, clients_to, message=None):
         # Si no se es provisto un aargumento de mensaje, obtener el mensaje del campo de texto
@@ -483,7 +495,7 @@ class ServerGUI:
     # Manejar los mensajes recibidos
     def handle_parsed_message(self, sender, clients_to, message_text):
 
-        # If the message starts with 'ADVERTENCIA:', handle it separately
+        # i el mensaje comienza con 'ADVERTENCIA:' lo maneja separado
         if message_text.startswith('ADVERTENCIA:'):
             parts = message_text.split(' ')
             if len(parts) > 2:
@@ -557,7 +569,7 @@ class ServerGUI:
     def print_client_status(self):
         status_message = '' # Mensaje de estado de los clientes en blanco
         for client_name, client_info in self.connections.items():# Para cada cliente en la lista de conexiones
-            status = 'connected' if client_info['connected'] else 'disconnected'# El cliente psa a estar conectado si se encuentra en la lista de conexiones
+            status = 'connected' if client_info['connected'] else 'disconnected'# El cliente pasa a estar conectado si se encuentra en la lista de conexiones
             status_message += f'{client_name}: {status},\n' # Mensaje de estado de los clientes
         self.send_hidden_message_to_all(status_message) # Envia el mensaje oculto a todos los clientes
         self.send_inactive_clients_to_all() # Envia los clientes inactivos a todos los clientes
@@ -581,8 +593,6 @@ class ServerGUI:
                 try:
                     client_info['connection'].sendall(message.encode())
                     time.sleep(0.1)
-                    print(f'Sent inactive clients to {client_name}')
-                    print(f'Message: {message}')
                 except Exception as e:
                     self.log(f'Error sending inactive clients to {client_name}: {e}')
 
