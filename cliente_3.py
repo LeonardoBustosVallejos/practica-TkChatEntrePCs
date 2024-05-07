@@ -20,7 +20,7 @@ class ClientGUI:
 # ======================================= IZQUIERDA DE LA GUI =======================================
         # Etiqueta de nombre del servidor
         self.name = tk.StringVar()
-        self.name.set("Pato")
+        self.name.set("CARBON")
 
         # Label para el nombre del usuario
         self.name_label = tk.Label(master, text='USUARIO: ')
@@ -273,7 +273,6 @@ class ClientGUI:
         client = ''  # Initialize client
         if len(parts) > 1:
             client = parts[1].strip().split(' ')[1]
-            print(f'Client: {client}')  # Debug line
             if client in self.innactive_clients:
                 self.innactive_clients.remove(client)
                 self.update_buttons_colors(client, 'connected')
@@ -284,6 +283,11 @@ class ClientGUI:
                     self.log(f'EL CLIENTE {client} YA NO ESTA INACTIVO')
         print(f'Self.innactive_clients: {self.innactive_clients}\nSelf.connected_clients: {self.connected_clients}\nClient: {client}')
 
+
+        #if client == self.name.get():
+        #    self.log('TE HAZ REACTIVADO')
+        #elif self.innactive_clients is not None and client in self.connected_clients:
+        #    self.log(f'EL CLIENTE {client} YA NO ESTA INACTIVO')
 # ===================================================================================================
 
 # ==================================== FUNCIONES DE CLIENTES ========================================
@@ -400,25 +404,6 @@ class ClientGUI:
 
 # ===================================================================================================
 # ====================================== MENSAJES ===================================================
-    # Función para manejar los datos recibidos
-    def handle_received_data(self, data):
-        if not data: # Si no hay datos
-            self.handle_server_disconnection() # Maneja la desconexión del servidor
-        elif data.startswith('HIDDEN:'): # Si los datos empiezan con 'HIDDEN:'
-            self.handle_hidden_message(data[7:]) # Maneja los mensajes ocultos
-        elif data.startswith('INACTIVES:'): # Si los datos empiezan con 'INACTIVES:'
-            self.handle_inctive_clients_from_server(data[10:]) # Maneja los clientes inactivos
-        elif data == 'Sistema: SERVIDOR CAIDO...': # Si los datos son 'Sistema: SERVIDOR CAIDO...'
-            self.server_broken() # Maneja la caída del servidor
-        elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
-            self.update_sent_messages(data) # Actualiza los mensajes enviados
-        elif data.startswith('Sistema: ADVERTENCIA:'): # Si los datos empiezan con 'MESSAGE'
-            self.handle_inactive_clients(data) # Agrega los datos a la caja de texto de log
-        elif data.startswith('Sistema: Cliente'): # Si los datos empiezan con 'MESSAGE'   
-            self.handle_reactived_clients(data) # Agrega los datos a la caja de texto de log
-        else: # En cualquier otro caso
-            self.log(data) # Agrega los datos a la caja de texto de log
-
     def send_message(self): # Función para enviar un mensaje
         message = self.message_text.get('1.0', tk.END).strip() # Obtiene el mensaje del text box
         self.enable_log()
@@ -477,22 +462,30 @@ class ClientGUI:
                 self.socket.close()
                 break
 
+    # Función para manejar los datos recibidos
+    def handle_received_data(self, data):
+        if not data: # Si no hay datos
+            self.handle_server_disconnection() # Maneja la desconexión del servidor
+        elif data.startswith('HIDDEN:'): # Si los datos empiezan con 'HIDDEN:'
+            self.handle_hidden_message(data[7:]) # Maneja los mensajes ocultos
+        elif data == 'Sistema: SERVIDOR CAIDO...': # Si los datos son 'Sistema: SERVIDOR CAIDO...'
+            self.server_broken() # Maneja la caída del servidor
+        elif data.startswith('RESPONSE'): # Si los datos empiezan con 'RESPONSE'
+            self.update_sent_messages(data) # Actualiza los mensajes enviados
+        elif data.startswith('Sistema: ADVERTENCIA:'): # Si los datos empiezan con 'MESSAGE'
+            self.handle_inactive_clients(data) # Agrega los datos a la caja de texto de log
+        elif data.startswith('Sistema: Cliente'): # Si los datos empiezan con 'MESSAGE'   
+            self.handle_reactived_clients(data) # Agrega los datos a la caja de texto de log
+        else: # En cualquier otro caso
+            self.log(data) # Agrega los datos a la caja de texto de log
+
     # Función para manejar los mensajes ocultos
     def handle_hidden_message(self, hidden_message):
-        print(f'Hidden message: {hidden_message}') # Linea de debug
         client_status_pairs = hidden_message.split(',') # Divide los mensajes ocultos en pares de cliente y estado
         connected_clients = self.get_connected_clients(client_status_pairs) # Obtiene los clientes conectados
-        print(f'Connected clients: {connected_clients}') # Linea de debug
         self.update_disconnected_clients(connected_clients) # Actualiza los clientes desconectados
         self.connected_clients = connected_clients # Actualiza la lista de clientes conectados
 
-    # Función para manejar los clientes inactivos cuando se conecta al servidor
-    def handle_inctive_clients_from_server(self, data):
-        data = data.split(',')
-        for client in data:
-            if client != '':
-                self.verify_inactive_clients(client)
-    
     # Función para actualizar los mensajes enviados
     def update_sent_messages(self, response):
         self.log('end', response + '\n') # Agrega los mensajes enviados a la caja de texto de log

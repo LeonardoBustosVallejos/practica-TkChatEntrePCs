@@ -557,9 +557,10 @@ class ServerGUI:
     def print_client_status(self):
         status_message = '' # Mensaje de estado de los clientes en blanco
         for client_name, client_info in self.connections.items():# Para cada cliente en la lista de conexiones
-            status = 'connected' if client_info['connected'] else 'disconnected'# El cliente psa a estaar conectado si se encuentra en la lista de conexiones
+            status = 'connected' if client_info['connected'] else 'disconnected'# El cliente psa a estar conectado si se encuentra en la lista de conexiones
             status_message += f'{client_name}: {status},\n' # Mensaje de estado de los clientes
         self.send_hidden_message_to_all(status_message) # Envia el mensaje oculto a todos los clientes
+        self.send_inactive_clients_to_all() # Envia los clientes inactivos a todos los clientes
 
     # Enviar un mensaje a todos los clientes
     def send_hidden_message_to_all(self, message):
@@ -571,9 +572,19 @@ class ServerGUI:
 
                 except Exception as e:
                     self.log(f'Error sending hidden message to {client_name}: {e}')
-
-            if self.inactive_clients and client_name in self.inactive_clients:
-                self.log('Ya hay un cliente inactivo')# Muestra el mensaje en la ventana de log
+        
+    def send_inactive_clients_to_all(self):
+        inactive_clients = ', '.join(self.inactive_clients)
+        message = f'INACTIVES:{inactive_clients}'
+        for client_name, client_info in self.connections.items():
+            if client_info['connected']:
+                try:
+                    client_info['connection'].sendall(message.encode())
+                    time.sleep(0.1)
+                    print(f'Sent inactive clients to {client_name}')
+                    print(f'Message: {message}')
+                except Exception as e:
+                    self.log(f'Error sending inactive clients to {client_name}: {e}')
 
     # Enviar un mensaje a todos los clientes como el sistema
     def send_system_message(self, message, exclude_client=None):
