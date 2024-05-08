@@ -16,6 +16,7 @@ class ServerGUI:
         master.geometry('800x380')
         master.protocol("WM_DELETE_WINDOW", lambda: self.stop_server(close_gui=True))# Al cerrar la ventana se detiene el server
         self.client_var = tk.StringVar()   # Variable para el nombre del cliente
+
 # ======================================= IZQUIERDA DE LA GUI =======================================
 
         # Etiqueta de nombre del servidor
@@ -255,6 +256,14 @@ class ServerGUI:
             self.master.destroy()
 # ===================================================================================================
     # ======================= BOTONES =======================
+
+    # Crear un botón para un cliente
+    def create_button(self, client_name):
+        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
+        button.bind('<Button-1>', lambda e: self.select_client(client_name))
+        button.update_idletasks()
+        return button
+
     def update_buttons_green(self, client_name):
         if client_name in self.client_buttons:
             self.client_buttons[client_name].config(bg='green')
@@ -266,13 +275,6 @@ class ServerGUI:
     def update_buttons_red(self, client_name):
         if client_name in self.client_buttons:
             self.client_buttons[client_name].config(bg='red')
-
-    # Crear un botón para un cliente
-    def create_button(self, client_name):
-        button = tk.Button(self.buttons_frame, text=client_name, width=10, height=1)
-        button.bind('<Button-1>', lambda e: self.select_client(client_name))
-        button.update_idletasks()
-        return button
 
         # actualizar el menu de conectados
     def update_client_buttons(self):
@@ -450,30 +452,20 @@ class ServerGUI:
 # =================================================================================================
 # ===================================== MENSAJES ======================================================
     def send_message(self, sender, clients_to, message=None):
-        # Si no se es provisto un aargumento de mensaje, obtener el mensaje del campo de texto
+        # If no message argument is provided, get the message from the text field
         if message is None:
             message = self.message_text.get('1.0', 'end').strip()
             self.message_text.delete('1.0', 'end')
 
-        # Si el mensaje esta vacio, no hacer nada
+        # If the message is empty, do nothing
         if message == '':
             return
         
-        # Si el remitente es el servidor
-        if sender == 'Servidor':
-            # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
-            if 'Global' in clients_to or not clients_to: 
-                self.send_global_message(sender, message) # Envia un mensaje global
-            # Si 'Global' no esta en la lista de clientes a los que se envio el mensaje
-            elif 'Global' not in clients_to and clients_to: 
-                self.send_private_message(sender, message) # Envia un mensaje privado
-        # En cualquier otro caso
+        # If 'Global' is in the list of clients to whom the message was sent or the list is empty
+        if 'Global' in clients_to or not clients_to: 
+            self.send_global_message(sender, message) # Send a global message
         else:
-            # Si 'Global' esta en la lista de clientes a los que se envio el mensaje
-            if 'Global' in clients_to:
-                self.send_global_message(sender, message) # Envia un mensaje global
-            else:
-                self.send_private_message(sender, message) # Envia un mensaje privado
+            self.send_private_message(sender, message) # Send a private message
 
     # Recibe un mensaje del cliente
     def receive_message(self, client_socket):
@@ -586,12 +578,12 @@ class ServerGUI:
                     self.log(f'Error sending hidden message to {client_name}: {e}')
         
     def send_inactive_clients_to_all(self):
-        inactive_clients = ', '.join(self.inactive_clients)
-        message = f'INACTIVES:{inactive_clients}'
-        for client_name, client_info in self.connections.items():
-            if client_info['connected']:
+        inactive_clients = ', '.join(self.inactive_clients)# Convierte la lista de clientes inactivos en una cadena de texto
+        message = f'INACTIVES:{inactive_clients}' # Mensaje de clientes inactivos
+        for client_name, client_info in self.connections.items(): # Para cada cliente en la lista de conexiones
+            if client_info['connected']: # Si el cliente esta conectado
                 try:
-                    client_info['connection'].sendall(message.encode())
+                    client_info['connection'].sendall(message.encode()) # Envia el mensaje a todos los clientes
                     time.sleep(0.1)
                 except Exception as e:
                     self.log(f'Error sending inactive clients to {client_name}: {e}')
